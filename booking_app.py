@@ -5,7 +5,7 @@ from streamlit_calendar import calendar
 import gspread
 from gspread_dataframe import set_with_dataframe, get_as_dataframe
 
-# --- ⚠️ 這裡填入你的網址 ---
+# --- ⚠️ 你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
 
 # --- 設定 ---
@@ -26,41 +26,44 @@ def get_worksheet():
         sh = gc.open_by_url(SHEET_URL)
         return sh.worksheet("Sheet1")
     except Exception as e:
-        st.error(f"連線失敗: {e}")
+        # 暫時忽略連線錯誤，避免洗版，交由 load_data 處理
         return None
 
+# 👇 改良點：加上快取功能 (ttl=10 代表資料會暫存 10 秒)
+# 這樣就算你狂按按鈕，也不會一直消耗 Google 的額度
+@st.cache_data(ttl=10)
 def load_data():
     ws = get_worksheet()
     if ws:
-        # 讀取全部資料，不解析日期，全部當字串讀進來最保險
-        df = get_as_dataframe(ws, usecols=[0,1,2,3,4,5], parse_dates=False, dtype=str)
-        
-        # 1. 刪除全空行
-        df = df.dropna(how='all')
-        
-        # 2. 清理資料：把 NaN 變成空字串
-        df = df.fillna("")
-        
-        # 3. 過濾掉沒有日期的無效資料
-        df = df[df['日期'] != ""]
-        
-        return df
+        try:
+            # 讀取資料
+            df = get_as_dataframe(ws, usecols=[0,1,2,3,4,5], parse_dates=False, dtype=str)
+            df = df.dropna(how='all') # 刪除空行
+            df = df.fillna("") # 填補空值
+            df = df[df['日期'] != ""] # 過濾無效日期
+            return df
+        except Exception:
+            pass
     return pd.DataFrame(columns=["日期", "開始時間", "結束時間", "大名", "預約內容", "登記時間"])
 
 def save_data(df):
     ws = get_worksheet()
     if ws:
-        ws.clear()
-        set_with_dataframe(ws, df)
+        try:
+            ws.clear()
+            set_with_dataframe(ws, df)
+            # 👇 關鍵：寫入後，立刻清除快取，這樣才會馬上看到新資料
+            load_data.clear()
+        except Exception as e:
+            st.error(f"寫入失敗: {e}")
 
 def check_overlap(df, check_date, start_t, end_t):
     if df.empty or '日期' not in df.columns: return None
     
-    # 統一日期格式
     check_date_str = check_date.strftime("%Y-%m-%d")
     
-    # 為了比對，我們需要把 DataFrame 裡的日期也統一格式
-    # 這裡做一個臨時欄位來比對，避免改到原始資料
+    # 建立臨時欄位統一格式
+    # 這裡加上 .astype(str) 確保不會因為資料格式問題報錯
     df['temp_date'] = df['日期'].astype(str).str.replace('/', '-').str.strip()
     
     day_bookings = df[df['temp_date'] == check_date_str]
@@ -89,7 +92,10 @@ with st.expander("➕ 新增預約", expanded=True):
         content = st.text_input("內容")
         
         if st.form_submit_button("送出預約", use_container_width=True):
+            # 這裡我們不讀取快取，強制重新抓一次最新資料來檢查衝突
+            load_data.clear() 
             df = load_data()
+            
             if not name or not content:
                 st.error("❌ 資訊不完整")
             elif s_time >= e_time:
@@ -115,14 +121,11 @@ with st.expander("➕ 新增預約", expanded=True):
 
 st.markdown("---")
 
-# 讀取資料
+# 讀取資料 (這裡會使用快取，不會一直扣額度)
 df = load_data()
 
-# --- 除錯神器 ---
-# 如果看不到資料，勾選這個就可以看到原始表格長什麼樣子
-if st.checkbox("🔍 顯示原始資料表 (除錯用)"):
-    st.write("這是從 Google Sheets 讀到的原始資料：")
-    st.dataframe(df)
+# 除錯用：如果還是 429，可以把這行打開看是不是資料有進來
+# st.write(f"資料筆數: {len(df)}")
 
 view_mode = st.radio("模式", ["📱 清單", "💻 週視圖"], horizontal=True)
 events = []
@@ -130,11 +133,9 @@ events = []
 if not df.empty and '日期' in df.columns:
     for _, row in df.iterrows():
         try:
-            # 1. 強制把日期裡的斜線換成橫線 (2025/11/26 -> 2025-11-26)
             clean_date = str(row['日期']).replace('/', '-').strip()
+            if not clean_date: continue 
             
-            # 2. 確保時間格式正確 (有些 Excel 會讀成 8:00:00，有些是 08:00:00)
-            # 我們直接拿字串拼起來
             start_iso = f"{clean_date}T{row['開始時間']}"
             end_iso = f"{clean_date}T{row['結束時間']}"
             
@@ -144,8 +145,7 @@ if not df.empty and '日期' in df.columns:
                 "end": end_iso, 
                 "backgroundColor": "#3788d8"
             })
-        except Exception as e:
-            # 如果某一筆資料格式太爛讀不到，就跳過它，不要讓整個網頁掛掉
+        except:
             continue
         
 calendar(events=events, options={
