@@ -1,4 +1,4 @@
 streamlit
 pandas
 streamlit-calendar
-streamlit-gsheets
+st-gsheets-connection
