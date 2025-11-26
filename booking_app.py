@@ -4,7 +4,7 @@ from datetime import datetime, time
 from streamlit_calendar import calendar
 from streamlit_gsheets import GSheetsConnection
 
-# --- ⚠️ 記得把這裡換成你的網址 ---
+# --- ⚠️ 這裡填入你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
 
 # --- 設定 ---
@@ -16,7 +16,8 @@ for h in range(8, 17):
 
 # --- 函數區 ---
 def load_data():
-    conn = st.connection("gsheets", type=GSheetsConnection)
+    # 👇 改用新通道名稱 booking_db
+    conn = st.connection("booking_db", type=GSheetsConnection)
     try:
         df = conn.read(spreadsheet=SHEET_URL, worksheet="Sheet1", ttl=0)
         return df
@@ -24,7 +25,8 @@ def load_data():
         return pd.DataFrame(columns=["日期", "開始時間", "結束時間", "大名", "預約內容", "登記時間"])
 
 def save_data(df):
-    conn = st.connection("gsheets", type=GSheetsConnection)
+    # 👇 改用新通道名稱 booking_db
+    conn = st.connection("booking_db", type=GSheetsConnection)
     try:
         conn.update(spreadsheet=SHEET_URL, worksheet="Sheet1", data=df)
     except Exception as e:
@@ -78,11 +80,9 @@ with st.expander("➕ 新增預約", expanded=True):
                         "預約內容": content, 
                         "登記時間": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
-                    # --- 這裡我把它拆開寫，避免複製時出錯 ---
                     new_df = pd.DataFrame([new_row])
                     updated_df = pd.concat([df, new_df], ignore_index=True)
                     save_data(updated_df)
-                    # ------------------------------------
                     st.success("✅ 預約成功！")
                     st.rerun()
 
@@ -110,7 +110,6 @@ with st.expander("🗑️ 刪除"):
         df['刪除'] = False
         edited = st.data_editor(df, column_config={"刪除": st.column_config.CheckboxColumn(required=True)})
         if st.button("確認刪除"):
-            # 這裡也拆開寫
             items_to_keep = edited[edited['刪除'] == False]
             final_df = items_to_keep.drop(columns=['刪除'])
             save_data(final_df)
