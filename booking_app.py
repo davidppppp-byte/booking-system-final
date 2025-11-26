@@ -2,10 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, time
 from streamlit_calendar import calendar
-# 👇 這裡改回 streamlit_gsheets，因為安裝好的套件裡面是叫這個名字
 from streamlit_gsheets import GSheetsConnection
 
-# --- ⚠️ 這裡填入你的網址 ---
+# --- ⚠️ 記得把這裡換成你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
 
 # --- 設定 ---
@@ -19,11 +18,9 @@ for h in range(8, 17):
 def load_data():
     conn = st.connection("gsheets", type=GSheetsConnection)
     try:
-        # 指定讀取 Sheet1
         df = conn.read(spreadsheet=SHEET_URL, worksheet="Sheet1", ttl=0)
         return df
     except Exception as e:
-        st.warning(f"⚠️ 讀取資料時發生狀況 (可能是空表或連線問題): {e}")
         return pd.DataFrame(columns=["日期", "開始時間", "結束時間", "大名", "預約內容", "登記時間"])
 
 def save_data(df):
@@ -31,7 +28,7 @@ def save_data(df):
     try:
         conn.update(spreadsheet=SHEET_URL, worksheet="Sheet1", data=df)
     except Exception as e:
-        st.error(f"寫入失敗，請檢查權限: {e}")
+        st.error(f"寫入失敗: {e}")
 
 def check_overlap(df, check_date, start_t, end_t):
     if df.empty or '日期' not in df.columns: return None
@@ -61,6 +58,7 @@ with st.expander("➕ 新增預約", expanded=True):
         s_time = c2.selectbox("開始", TIME_OPTIONS, index=0)
         e_time = c2.selectbox("結束", TIME_OPTIONS, index=2)
         content = st.text_input("內容")
+        
         if st.form_submit_button("送出預約", use_container_width=True):
             df = load_data()
             if not name or not content:
@@ -72,5 +70,48 @@ with st.expander("➕ 新增預約", expanded=True):
                 if conflict:
                     st.error(f"❌ 衝突！已被 {conflict} 預約")
                 else:
-                    new_row = {"日期": date_val.strftime("%Y-%m-%d"), "開始時間": s_time.strftime("%H:%M:%S"), "結束時間": e_time.strftime("%H:%M:%S"), "大名": name, "預約內容": content, "登記時間": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-                    save_data(pd.concat([df, pd.DataFrame([new_
+                    new_row = {
+                        "日期": date_val.strftime("%Y-%m-%d"), 
+                        "開始時間": s_time.strftime("%H:%M:%S"), 
+                        "結束時間": e_time.strftime("%H:%M:%S"), 
+                        "大名": name, 
+                        "預約內容": content, 
+                        "登記時間": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                    # --- 這裡我把它拆開寫，避免複製時出錯 ---
+                    new_df = pd.DataFrame([new_row])
+                    updated_df = pd.concat([df, new_df], ignore_index=True)
+                    save_data(updated_df)
+                    # ------------------------------------
+                    st.success("✅ 預約成功！")
+                    st.rerun()
+
+st.markdown("---")
+view_mode = st.radio("模式", ["📱 清單", "💻 週視圖"], horizontal=True)
+df = load_data()
+events = []
+if not df.empty and '日期' in df.columns:
+    for _, row in df.iterrows():
+        events.append({
+            "title": f"{row['大名']}: {row['預約內容']}", 
+            "start": f"{row['日期']}T{row['開始時間']}", 
+            "end": f"{row['日期']}T{row['結束時間']}", 
+            "backgroundColor": "#3788d8"
+        })
+        
+calendar(events=events, options={
+    "initialView": "listWeek" if view_mode == "📱 清單" else "timeGridWeek", 
+    "headerToolbar": {"left": "today prev,next", "center": "title", "right": ""}, 
+    "height": "auto"
+})
+
+with st.expander("🗑️ 刪除"):
+    if not df.empty:
+        df['刪除'] = False
+        edited = st.data_editor(df, column_config={"刪除": st.column_config.CheckboxColumn(required=True)})
+        if st.button("確認刪除"):
+            # 這裡也拆開寫
+            items_to_keep = edited[edited['刪除'] == False]
+            final_df = items_to_keep.drop(columns=['刪除'])
+            save_data(final_df)
+            st.rerun()
