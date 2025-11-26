@@ -16,8 +16,8 @@ for h in range(8, 17):
 
 # --- 函數區 ---
 def load_data():
-    # 👇 改用新通道名稱 booking_db
-    conn = st.connection("booking_db", type=GSheetsConnection)
+    # 改回標準名稱 gsheets
+    conn = st.connection("gsheets", type=GSheetsConnection)
     try:
         df = conn.read(spreadsheet=SHEET_URL, worksheet="Sheet1", ttl=0)
         return df
@@ -25,12 +25,9 @@ def load_data():
         return pd.DataFrame(columns=["日期", "開始時間", "結束時間", "大名", "預約內容", "登記時間"])
 
 def save_data(df):
-    # 👇 改用新通道名稱 booking_db
-    conn = st.connection("booking_db", type=GSheetsConnection)
-    try:
-        conn.update(spreadsheet=SHEET_URL, worksheet="Sheet1", data=df)
-    except Exception as e:
-        st.error(f"寫入失敗: {e}")
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    # 直接回傳是否成功，不做錯誤處理，讓主程式處理
+    conn.update(spreadsheet=SHEET_URL, worksheet="Sheet1", data=df)
 
 def check_overlap(df, check_date, start_t, end_t):
     if df.empty or '日期' not in df.columns: return None
@@ -82,9 +79,13 @@ with st.expander("➕ 新增預約", expanded=True):
                     }
                     new_df = pd.DataFrame([new_row])
                     updated_df = pd.concat([df, new_df], ignore_index=True)
-                    save_data(updated_df)
-                    st.success("✅ 預約成功！")
-                    st.rerun()
+                    
+                    try:
+                        save_data(updated_df)
+                        st.success("✅ 預約成功！")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ 寫入權限錯誤：系統未偵測到金鑰，請檢查 Secrets 設定。\n錯誤訊息: {e}")
 
 st.markdown("---")
 view_mode = st.radio("模式", ["📱 清單", "💻 週視圖"], horizontal=True)
@@ -110,7 +111,10 @@ with st.expander("🗑️ 刪除"):
         df['刪除'] = False
         edited = st.data_editor(df, column_config={"刪除": st.column_config.CheckboxColumn(required=True)})
         if st.button("確認刪除"):
-            items_to_keep = edited[edited['刪除'] == False]
-            final_df = items_to_keep.drop(columns=['刪除'])
-            save_data(final_df)
-            st.rerun()
+            try:
+                items_to_keep = edited[edited['刪除'] == False]
+                final_df = items_to_keep.drop(columns=['刪除'])
+                save_data(final_df)
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ 刪除失敗：{e}")
