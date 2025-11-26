@@ -28,17 +28,33 @@ def get_worksheet():
     except Exception as e:
         return None
 
-# 👇 加強版讀取：強制所有欄位都變成文字 (String)，避免 Excel 自動把日期變成數字
+# --- 強力格式修正函數 (本次新增) ---
+def fix_time(t_str):
+    """
+    把各種怪時間 (8:00, 8:00:00, 08:0) 全部統一變成標準的 HH:MM:SS (08:00:00)
+    """
+    if not t_str: return None
+    t_str = str(t_str).strip()
+    
+    # 1. 如果只有 "8:00"，補上秒數變成 "8:00:00"
+    if t_str.count(":") == 1:
+        t_str += ":00"
+    
+    # 2. 利用 datetime 自動補 0 (8 -> 08)
+    try:
+        dt = datetime.strptime(t_str, "%H:%M:%S")
+        return dt.strftime("%H:%M:%S") # 這行保證吐出來是兩位數小時
+    except:
+        return None # 格式真的爛到修不好就放棄
+
 @st.cache_data(ttl=10)
 def load_data():
     ws = get_worksheet()
     if ws:
         try:
-            # dtype=str 非常重要！它會強迫讀取到的內容原封不動，不要讓 Pandas 自作聰明亂改格式
             df = get_as_dataframe(ws, usecols=[0,1,2,3,4,5], parse_dates=False, dtype=str)
             df = df.dropna(how='all')
             df = df.fillna("")
-            # 只要日期欄位有字，我們就留著
             df = df[df['日期'].str.len() > 0]
             return df
         except Exception:
@@ -59,7 +75,6 @@ def check_overlap(df, check_date, start_t, end_t):
     if df.empty or '日期' not in df.columns: return None
     
     check_date_str = check_date.strftime("%Y-%m-%d")
-    # 簡單粗暴：把所有斜線都換成橫線
     df['temp_date'] = df['日期'].astype(str).str.replace('/', '-').str.strip()
     
     day_bookings = df[df['temp_date'] == check_date_str]
@@ -116,12 +131,9 @@ with st.expander("➕ 新增預約", expanded=True):
 st.markdown("---")
 
 df = load_data()
-
-# 🔥🔥🔥 除錯區域 (如果成功後可以註解掉) 🔥🔥🔥
-st.subheader("🔍 資料檢查站")
-st.info("如果你在這裡看到資料，但下面行事曆沒有，代表『日期格式』有問題。")
-st.dataframe(df) # 直接把讀到的表格印出來給你看
-# 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+# 我把除錯表格拿掉了，因為我們知道資料有進來，現在重點是格式
+# 如果你想看，可以自己把下面這行打開
+# st.dataframe(df)
 
 view_mode = st.radio("模式", ["📱 清單", "💻 週視圖"], horizontal=True)
 events = []
@@ -129,20 +141,19 @@ events = []
 if not df.empty and '日期' in df.columns:
     for _, row in df.iterrows():
         try:
-            # 1. 強力清洗日期格式
+            # 1. 處理日期
             raw_date = str(row['日期']).strip()
-            # 把 2025/11/26 變成 2025-11-26
             clean_date = raw_date.replace('/', '-')
             
-            # 2. 強力清洗時間格式 (有些 Excel 會變成 8:00 而不是 08:00:00)
-            start_t = str(row['開始時間']).strip()
-            end_t = str(row['結束時間']).strip()
+            # 2. 處理時間 (這是本次修正重點！)
+            # 呼叫我們新寫的 fix_time 函數，它會把 "8:00" 變成 "08:00:00"
+            start_t = fix_time(row['開始時間'])
+            end_t = fix_time(row['結束時間'])
             
-            # 補齊秒數 (如果只有 08:00 就補成 08:00:00)
-            if len(start_t) <= 5: start_t += ":00"
-            if len(end_t) <= 5: end_t += ":00"
-            
-            # 3. 組合 ISO 格式
+            # 如果時間修不好 (是空的)，就跳過這筆
+            if not start_t or not end_t: continue
+
+            # 3. 組合
             start_iso = f"{clean_date}T{start_t}"
             end_iso = f"{clean_date}T{end_t}"
             
@@ -152,15 +163,15 @@ if not df.empty and '日期' in df.columns:
                 "end": end_iso, 
                 "backgroundColor": "#3788d8"
             })
-        except Exception as e:
-            # 如果這行資料壞了，印出錯誤讓我們知道
-            st.warning(f"這筆資料無法顯示: {row}，原因: {e}")
+        except Exception:
             continue
         
 calendar(events=events, options={
     "initialView": "listWeek" if view_mode == "📱 清單" else "timeGridWeek", 
     "headerToolbar": {"left": "today prev,next", "center": "title", "right": ""}, 
-    "height": "auto"
+    "height": "auto",
+    "slotMinTime": "08:00:00",
+    "slotMaxTime": "18:00:00"
 })
 
 with st.expander("🗑️ 刪除"):
