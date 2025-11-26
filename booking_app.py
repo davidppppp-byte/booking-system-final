@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, time
 from streamlit_calendar import calendar
-from streamlit_gsheets import GSheetsConnection
+import gspread
+from gspread_dataframe import set_with_dataframe
 
 # --- ⚠️ 這裡填入你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
@@ -14,20 +15,41 @@ for h in range(8, 17):
         if h == 16 and m > 30: break
         TIME_OPTIONS.append(time(h, m))
 
-# --- 函數區 ---
-def load_data():
-    # 改回標準名稱 gsheets
-    conn = st.connection("gsheets", type=GSheetsConnection)
+# --- 連線函數 (手動駕駛模式) ---
+def get_worksheet():
+    """直接使用 gspread 進行連線，不再依賴 st.connection"""
     try:
-        df = conn.read(spreadsheet=SHEET_URL, worksheet="Sheet1", ttl=0)
-        return df
+        # 1. 直接從 Secrets 拿金鑰
+        # (我們假設你的 Secrets 結構是 [connections.gsheets.service_account])
+        if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+            creds = st.secrets["connections"]["gsheets"]["service_account"]
+        else:
+            # 如果結構不同，嘗試直接讀取 (有些人的 secrets 沒那層 connections)
+            creds = st.secrets["service_account"]
+
+        # 2. 進行認證
+        gc = gspread.service_account_from_dict(creds)
+        
+        # 3. 開啟試算表
+        sh = gc.open_by_url(SHEET_URL)
+        return sh.worksheet("Sheet1")
     except Exception as e:
-        return pd.DataFrame(columns=["日期", "開始時間", "結束時間", "大名", "預約內容", "登記時間"])
+        st.error(f"連線失敗，請檢查 Secrets 設定與權限。\n詳細錯誤: {e}")
+        return None
+
+def load_data():
+    ws = get_worksheet()
+    if ws:
+        # 讀取所有資料並轉為 DataFrame
+        return pd.DataFrame(ws.get_all_records())
+    return pd.DataFrame(columns=["日期", "開始時間", "結束時間", "大名", "預約內容", "登記時間"])
 
 def save_data(df):
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    # 直接回傳是否成功，不做錯誤處理，讓主程式處理
-    conn.update(spreadsheet=SHEET_URL, worksheet="Sheet1", data=df)
+    ws = get_worksheet()
+    if ws:
+        # 清空並寫入新的 DataFrame
+        ws.clear()
+        set_with_dataframe(ws, df)
 
 def check_overlap(df, check_date, start_t, end_t):
     if df.empty or '日期' not in df.columns: return None
@@ -79,13 +101,9 @@ with st.expander("➕ 新增預約", expanded=True):
                     }
                     new_df = pd.DataFrame([new_row])
                     updated_df = pd.concat([df, new_df], ignore_index=True)
-                    
-                    try:
-                        save_data(updated_df)
-                        st.success("✅ 預約成功！")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ 寫入權限錯誤：系統未偵測到金鑰，請檢查 Secrets 設定。\n錯誤訊息: {e}")
+                    save_data(updated_df)
+                    st.success("✅ 預約成功！")
+                    st.rerun()
 
 st.markdown("---")
 view_mode = st.radio("模式", ["📱 清單", "💻 週視圖"], horizontal=True)
@@ -111,10 +129,7 @@ with st.expander("🗑️ 刪除"):
         df['刪除'] = False
         edited = st.data_editor(df, column_config={"刪除": st.column_config.CheckboxColumn(required=True)})
         if st.button("確認刪除"):
-            try:
-                items_to_keep = edited[edited['刪除'] == False]
-                final_df = items_to_keep.drop(columns=['刪除'])
-                save_data(final_df)
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ 刪除失敗：{e}")
+            items_to_keep = edited[edited['刪除'] == False]
+            final_df = items_to_keep.drop(columns=['刪除'])
+            save_data(final_df)
+            st.rerun()
