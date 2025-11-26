@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, time
 from streamlit_calendar import calendar
 import gspread
-from gspread_dataframe import set_with_dataframe
+from gspread_dataframe import set_with_dataframe, get_as_dataframe # 引入強力讀取工具
 
 # --- ⚠️ 這裡填入你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
@@ -15,46 +15,54 @@ for h in range(8, 17):
         if h == 16 and m > 30: break
         TIME_OPTIONS.append(time(h, m))
 
-# --- 連線函數 (手動駕駛模式) ---
+# --- 連線函數 ---
 def get_worksheet():
-    """直接使用 gspread 進行連線，不再依賴 st.connection"""
     try:
-        # 1. 直接從 Secrets 拿金鑰
-        # (我們假設你的 Secrets 結構是 [connections.gsheets.service_account])
+        # 1. 取得金鑰
         if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
             creds = st.secrets["connections"]["gsheets"]["service_account"]
         else:
-            # 如果結構不同，嘗試直接讀取 (有些人的 secrets 沒那層 connections)
             creds = st.secrets["service_account"]
 
-        # 2. 進行認證
+        # 2. 連線
         gc = gspread.service_account_from_dict(creds)
-        
-        # 3. 開啟試算表
         sh = gc.open_by_url(SHEET_URL)
         return sh.worksheet("Sheet1")
     except Exception as e:
-        st.error(f"連線失敗，請檢查 Secrets 設定與權限。\n詳細錯誤: {e}")
+        st.error(f"連線失敗: {e}")
         return None
 
 def load_data():
     ws = get_worksheet()
     if ws:
-        # 讀取所有資料並轉為 DataFrame
-        return pd.DataFrame(ws.get_all_records())
+        # 這裡改用 get_as_dataframe，它能完美處理格式
+        # usecols=True 確保只讀取有標題的欄位，忽略後面的空白欄
+        df = get_as_dataframe(ws, usecols=[0,1,2,3,4,5], parse_dates=False)
+        
+        # ⚠️ 關鍵修正：刪除完全空白的行 (Google Sheet 預設會有1000行空白)
+        df = df.dropna(how='all')
+        
+        # 確保「日期」這一欄有值，如果日期是空的也視為無效資料
+        df = df[df['日期'].notna()]
+        df = df[df['日期'] != ""]
+        
+        return df
     return pd.DataFrame(columns=["日期", "開始時間", "結束時間", "大名", "預約內容", "登記時間"])
 
 def save_data(df):
     ws = get_worksheet()
     if ws:
-        # 清空並寫入新的 DataFrame
-        ws.clear()
+        ws.clear() # 清空舊資料
+        # 寫入新資料 (include_index=False 代表不要把索引號 0,1,2... 寫進去)
         set_with_dataframe(ws, df)
 
 def check_overlap(df, check_date, start_t, end_t):
     if df.empty or '日期' not in df.columns: return None
+    
+    # 確保所有資料都是字串，避免格式錯誤
     check_date_str = check_date.strftime("%Y-%m-%d")
     df['日期'] = df['日期'].astype(str)
+    
     day_bookings = df[df['日期'] == check_date_str]
     if day_bookings.empty: return None
     
@@ -106,17 +114,28 @@ with st.expander("➕ 新增預約", expanded=True):
                     st.rerun()
 
 st.markdown("---")
-view_mode = st.radio("模式", ["📱 清單", "💻 週視圖"], horizontal=True)
+
+# 讀取並顯示資料
 df = load_data()
+
+# Debug 訊息：如果還是沒出現，這行字會告訴我們現在讀到幾筆
+# st.write(f"目前讀取到 {len(df)} 筆預約") 
+
+view_mode = st.radio("模式", ["📱 清單", "💻 週視圖"], horizontal=True)
 events = []
+
 if not df.empty and '日期' in df.columns:
+    # 確保資料都轉為字串顯示，避免 NaN 報錯
+    df = df.astype(str)
     for _, row in df.iterrows():
-        events.append({
-            "title": f"{row['大名']}: {row['預約內容']}", 
-            "start": f"{row['日期']}T{row['開始時間']}", 
-            "end": f"{row['日期']}T{row['結束時間']}", 
-            "backgroundColor": "#3788d8"
-        })
+        # 雙重檢查：確保不是空字串
+        if row['日期'] and row['開始時間'] and row['結束時間']:
+            events.append({
+                "title": f"{row['大名']}: {row['預約內容']}", 
+                "start": f"{row['日期']}T{row['開始時間']}", 
+                "end": f"{row['日期']}T{row['結束時間']}", 
+                "backgroundColor": "#3788d8"
+            })
         
 calendar(events=events, options={
     "initialView": "listWeek" if view_mode == "📱 清單" else "timeGridWeek", 
