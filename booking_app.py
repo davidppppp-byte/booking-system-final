@@ -26,21 +26,20 @@ def get_worksheet():
         sh = gc.open_by_url(SHEET_URL)
         return sh.worksheet("Sheet1")
     except Exception as e:
-        # 暫時忽略連線錯誤，避免洗版，交由 load_data 處理
         return None
 
-# 👇 改良點：加上快取功能 (ttl=10 代表資料會暫存 10 秒)
-# 這樣就算你狂按按鈕，也不會一直消耗 Google 的額度
+# 👇 加強版讀取：強制所有欄位都變成文字 (String)，避免 Excel 自動把日期變成數字
 @st.cache_data(ttl=10)
 def load_data():
     ws = get_worksheet()
     if ws:
         try:
-            # 讀取資料
+            # dtype=str 非常重要！它會強迫讀取到的內容原封不動，不要讓 Pandas 自作聰明亂改格式
             df = get_as_dataframe(ws, usecols=[0,1,2,3,4,5], parse_dates=False, dtype=str)
-            df = df.dropna(how='all') # 刪除空行
-            df = df.fillna("") # 填補空值
-            df = df[df['日期'] != ""] # 過濾無效日期
+            df = df.dropna(how='all')
+            df = df.fillna("")
+            # 只要日期欄位有字，我們就留著
+            df = df[df['日期'].str.len() > 0]
             return df
         except Exception:
             pass
@@ -52,7 +51,6 @@ def save_data(df):
         try:
             ws.clear()
             set_with_dataframe(ws, df)
-            # 👇 關鍵：寫入後，立刻清除快取，這樣才會馬上看到新資料
             load_data.clear()
         except Exception as e:
             st.error(f"寫入失敗: {e}")
@@ -61,9 +59,7 @@ def check_overlap(df, check_date, start_t, end_t):
     if df.empty or '日期' not in df.columns: return None
     
     check_date_str = check_date.strftime("%Y-%m-%d")
-    
-    # 建立臨時欄位統一格式
-    # 這裡加上 .astype(str) 確保不會因為資料格式問題報錯
+    # 簡單粗暴：把所有斜線都換成橫線
     df['temp_date'] = df['日期'].astype(str).str.replace('/', '-').str.strip()
     
     day_bookings = df[df['temp_date'] == check_date_str]
@@ -92,10 +88,8 @@ with st.expander("➕ 新增預約", expanded=True):
         content = st.text_input("內容")
         
         if st.form_submit_button("送出預約", use_container_width=True):
-            # 這裡我們不讀取快取，強制重新抓一次最新資料來檢查衝突
-            load_data.clear() 
+            load_data.clear()
             df = load_data()
-            
             if not name or not content:
                 st.error("❌ 資訊不完整")
             elif s_time >= e_time:
@@ -121,11 +115,13 @@ with st.expander("➕ 新增預約", expanded=True):
 
 st.markdown("---")
 
-# 讀取資料 (這裡會使用快取，不會一直扣額度)
 df = load_data()
 
-# 除錯用：如果還是 429，可以把這行打開看是不是資料有進來
-# st.write(f"資料筆數: {len(df)}")
+# 🔥🔥🔥 除錯區域 (如果成功後可以註解掉) 🔥🔥🔥
+st.subheader("🔍 資料檢查站")
+st.info("如果你在這裡看到資料，但下面行事曆沒有，代表『日期格式』有問題。")
+st.dataframe(df) # 直接把讀到的表格印出來給你看
+# 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
 
 view_mode = st.radio("模式", ["📱 清單", "💻 週視圖"], horizontal=True)
 events = []
@@ -133,11 +129,22 @@ events = []
 if not df.empty and '日期' in df.columns:
     for _, row in df.iterrows():
         try:
-            clean_date = str(row['日期']).replace('/', '-').strip()
-            if not clean_date: continue 
+            # 1. 強力清洗日期格式
+            raw_date = str(row['日期']).strip()
+            # 把 2025/11/26 變成 2025-11-26
+            clean_date = raw_date.replace('/', '-')
             
-            start_iso = f"{clean_date}T{row['開始時間']}"
-            end_iso = f"{clean_date}T{row['結束時間']}"
+            # 2. 強力清洗時間格式 (有些 Excel 會變成 8:00 而不是 08:00:00)
+            start_t = str(row['開始時間']).strip()
+            end_t = str(row['結束時間']).strip()
+            
+            # 補齊秒數 (如果只有 08:00 就補成 08:00:00)
+            if len(start_t) <= 5: start_t += ":00"
+            if len(end_t) <= 5: end_t += ":00"
+            
+            # 3. 組合 ISO 格式
+            start_iso = f"{clean_date}T{start_t}"
+            end_iso = f"{clean_date}T{end_t}"
             
             events.append({
                 "title": f"{row['大名']}: {row['預約內容']}", 
@@ -145,7 +152,9 @@ if not df.empty and '日期' in df.columns:
                 "end": end_iso, 
                 "backgroundColor": "#3788d8"
             })
-        except:
+        except Exception as e:
+            # 如果這行資料壞了，印出錯誤讓我們知道
+            st.warning(f"這筆資料無法顯示: {row}，原因: {e}")
             continue
         
 calendar(events=events, options={
