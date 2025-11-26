@@ -9,7 +9,7 @@ from gspread_dataframe import set_with_dataframe, get_as_dataframe
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
 
 # --- 設定 ---
-ADMIN_PASSWORD = "8888"  # 🔐 設定你的管理員密碼
+ADMIN_PASSWORD = "8888"  # 🔐 管理員密碼
 TIME_OPTIONS = []
 for h in range(8, 17):
     for m in [0, 30]:
@@ -39,18 +39,18 @@ def fix_time(t_str):
     except:
         return None
 
-@st.cache_data(ttl=5) # 縮短快取時間，讓審核反應快一點
+@st.cache_data(ttl=5)
 def load_data():
     ws = get_worksheet()
     if ws:
         try:
-            # 讀取 7 個欄位 (0~6)，包含新增的「狀態」
+            # 讀取 7 個欄位 (A~G)，包含「狀態」
             df = get_as_dataframe(ws, usecols=[0,1,2,3,4,5,6], parse_dates=False, dtype=str)
             df = df.dropna(how='all')
             df = df.fillna("")
             df = df[df['日期'].str.len() > 0]
             
-            # 如果舊資料沒有狀態欄，自動補上 "核准" (假設舊的都是通過的)
+            # 如果舊資料沒有狀態欄，自動補上 "核准"
             if '狀態' not in df.columns:
                 df['狀態'] = '核准'
             
@@ -63,6 +63,11 @@ def save_data(df):
     ws = get_worksheet()
     if ws:
         try:
+            # 🛡️ 防呆機制：存檔前，把所有不該存在的暫存欄位 (如 temp_date) 刪掉
+            cols_to_keep = ["日期", "開始時間", "結束時間", "大名", "預約內容", "登記時間", "狀態"]
+            # 只保留標準欄位，其他雜質通通丟掉
+            df = df[cols_to_keep]
+            
             ws.clear()
             set_with_dataframe(ws, df)
             load_data.clear()
@@ -72,12 +77,11 @@ def save_data(df):
 def check_overlap(df, check_date, start_t, end_t):
     if df.empty or '日期' not in df.columns: return None
     
-    # 只檢查「已核准」的時段是否衝突 (待審核的不算佔用，或者你也可以改成算佔用)
-    # 這裡設定為：不管狀態如何，只要有人約了就先擋下來，避免重複申請
     check_date_str = check_date.strftime("%Y-%m-%d")
+    # 這裡產生的 temp_date 只是暫時用，存檔時會被上面的 save_data 過濾掉
     df['temp_date'] = df['日期'].astype(str).str.replace('/', '-').str.strip()
     
-    # 篩選同一天且「不是被拒絕」的預約 (待審核 + 核准 都要檢查)
+    # 檢查衝突：同一天 + (已核准 或 待審核)
     day_bookings = df[
         (df['temp_date'] == check_date_str) & 
         (df['狀態'] != '拒絕')
@@ -98,12 +102,12 @@ def check_overlap(df, check_date, start_t, end_t):
 st.set_page_config(page_title="會議預約系統", layout="wide", page_icon="📅")
 st.title("📅 部門會議系統 (需審核)")
 
-# --- 側邊欄：管理員登入 ---
+# --- 側邊欄 ---
 st.sidebar.header("🔒 管理員專區")
 admin_pwd = st.sidebar.text_input("輸入密碼進入審核", type="password")
 is_admin = admin_pwd == ADMIN_PASSWORD
 
-# --- 申請表單 (一般人) ---
+# --- 申請區 ---
 if not is_admin:
     with st.expander("➕ 申請預約 (需等待主管審核)", expanded=True):
         with st.form("booking_form"):
@@ -124,7 +128,7 @@ if not is_admin:
                 else:
                     conflict = check_overlap(df, date_val, s_time, e_time)
                     if conflict:
-                        st.error(f"❌ 無法申請！該時段已有「{conflict}」的預約 (或正在審核中)。")
+                        st.error(f"❌ 無法申請！該時段已被「{conflict}」佔用 (或審核中)。")
                     else:
                         new_row = {
                             "日期": date_val.strftime("%Y-%m-%d"), 
@@ -133,7 +137,7 @@ if not is_admin:
                             "大名": name, 
                             "預約內容": content, 
                             "登記時間": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "狀態": "待審核"  # 預設狀態
+                            "狀態": "待審核"
                         }
                         new_df = pd.DataFrame([new_row])
                         updated_df = pd.concat([df, new_df], ignore_index=True)
@@ -141,42 +145,31 @@ if not is_admin:
                         st.success("✅ 申請已送出！請等待主管核准。")
                         st.rerun()
 
-# --- 管理員審核介面 ---
+# --- 管理員區 ---
 else:
     st.sidebar.success("🔓 管理員已登入")
-    st.markdown("### 📋 預約審核管理")
-    
+    st.markdown("### 📋 審核管理")
     load_data.clear()
     df = load_data()
     
     if not df.empty:
-        # 讓管理員可以直接編輯表格
-        # 可以直接改「狀態」欄位： 待審核 / 核准 / 拒絕
         edited_df = st.data_editor(
             df,
             column_config={
-                "狀態": st.column_config.SelectboxColumn(
-                    "審核狀態",
-                    options=["待審核", "核准", "拒絕"],
-                    required=True,
-                ),
+                "狀態": st.column_config.SelectboxColumn("狀態", options=["待審核", "核准", "拒絕"], required=True),
                 "刪除": st.column_config.CheckboxColumn(required=True)
             },
             num_rows="dynamic",
             key="admin_editor"
         )
-        
-        c_save, c_cancel = st.columns([1, 4])
-        if c_save.button("💾 儲存所有變更", type="primary"):
+        if st.button("💾 儲存變更", type="primary"):
             save_data(edited_df)
-            st.success("資料已更新！")
+            st.success("已更新！")
             st.rerun()
-    else:
-        st.info("目前沒有任何預約資料。")
 
 st.markdown("---")
 
-# --- 行事曆顯示 (唯讀) ---
+# --- 行事曆 ---
 df = load_data()
 view_mode = st.radio("模式", ["📱 清單", "💻 週視圖"], horizontal=True)
 events = []
@@ -184,27 +177,22 @@ events = []
 if not df.empty and '日期' in df.columns:
     for _, row in df.iterrows():
         try:
-            # 只顯示「核准」的預約在行事曆上
-            # 如果你是管理員，可以看到所有狀態 (標示不同顏色)
             status = row.get('狀態', '核准')
+            # 非管理員只能看已核准的
+            if not is_admin and status != '核准': continue
             
-            if not is_admin and status != '核准':
-                continue # 一般人只看得到核准的
-            
-            raw_date = str(row['日期']).strip()
-            clean_date = raw_date.replace('/', '-')
+            clean_date = str(row['日期']).replace('/', '-').strip()
             start_t = fix_time(row['開始時間'])
             end_t = fix_time(row['結束時間'])
             
             if not start_t or not end_t: continue
 
-            # 設定顏色：核准=藍, 待審核=橘, 拒絕=灰
             bg_color = "#3788d8"
             if status == '待審核': bg_color = "#f39c12"
             elif status == '拒絕': bg_color = "#7f8c8d"
 
             title_text = f"{row['大名']}: {row['預約內容']}"
-            if is_admin: title_text = f"[{status}] " + title_text
+            if is_admin: title_text = f"[{status}] {title_text}"
 
             events.append({
                 "title": title_text, 
@@ -213,7 +201,7 @@ if not df.empty and '日期' in df.columns:
                 "backgroundColor": bg_color,
                 "borderColor": bg_color
             })
-        except Exception:
+        except:
             continue
         
 calendar(events=events, options={
@@ -224,5 +212,5 @@ calendar(events=events, options={
     "slotMaxTime": "18:00:00"
 })
 
-# 顯示狀態說明
-st.caption("🟦 藍色：已核准 | 🟧 橘色：審核中 (僅管理員可見) | ⬜ 灰色：已拒絕 (僅管理員可見)")
+if is_admin:
+    st.caption("🟦 核准 | 🟧 待審核 | ⬜ 拒絕")
