@@ -64,17 +64,13 @@ def load_data():
     ws = get_worksheet()
     if ws:
         try:
-            # 修改：讀取 9 個欄位 (0~8)，包含「與會人」
             df = get_as_dataframe(ws, usecols=list(range(9)), parse_dates=False, dtype=str)
             df = df.dropna(how='all')
             df = df.fillna("")
             df = df[df['日期'].str.len() > 0]
-            
-            # 補齊可能缺失的欄位
             if '狀態' not in df.columns: df['狀態'] = '核准'
             if '會議地點' not in df.columns: df['會議地點'] = ''
             if '與會人' not in df.columns: df['與會人'] = ''
-            
             return df
         except: pass
     return pd.DataFrame(columns=["日期", "開始時間", "結束時間", "大名", "與會人", "會議地點", "預約內容", "登記時間", "狀態"])
@@ -83,7 +79,6 @@ def save_data(df):
     ws = get_worksheet()
     if ws:
         try:
-            # 修改：存檔欄位順序
             cols = ["日期", "開始時間", "結束時間", "大名", "與會人", "會議地點", "預約內容", "登記時間", "狀態"]
             df = df[cols]
             ws.clear()
@@ -103,32 +98,39 @@ def check_overlap(df, check_date, start_t, end_t):
     if not overlap.empty: return overlap.iloc[0]['大名']
     return None
 
-# --- 彈跳視窗函數 ---
+# --- 🔥 新增：成功預約的感謝彈窗 ---
+@st.dialog("🎉 申請成功！")
+def show_success_message():
+    st.subheader("感謝您的預約")
+    st.write("主管審核通過後，將會自動同步至行事曆。")
+    
+    # 顯示你的感謝圖片
+    try:
+        img = Image.open("thank_you.jpg")
+        st.image(img, use_container_width=True)
+    except:
+        st.caption("(找不到感謝圖片，但預約已成功)")
+        
+    # 按下這個按鈕才會重新整理
+    if st.button("好的，我知道了", type="primary"):
+        st.rerun()
+
+# --- 彈跳視窗：顯示詳情 ---
 @st.dialog("📋 會議詳細資訊")
 def show_event_details(event_props):
     st.markdown(f"### **{event_props.get('content', '無內容')}**")
     st.write("---")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.caption("📍 會議地點")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.caption("📍 地點")
         st.info(event_props.get('location', '未指定'))
-        
-        # 新增：顯示與會人
         st.caption("👥 與會人")
-        attendees = event_props.get('attendees', '')
-        if attendees:
-            st.text(attendees)
-        else:
-            st.text("（無填寫）")
-
-    with col2:
+        st.text(event_props.get('attendees') if event_props.get('attendees') else "（無）")
+    with c2:
         st.caption("👤 預約人")
         st.info(event_props.get('name', '未知'))
-        
-        st.caption("⏰ 會議時間")
-        time_range = event_props.get('pretty_time', '')
-        st.warning(time_range if time_range else "時間未定")
+        st.caption("⏰ 時間")
+        st.warning(event_props.get('pretty_time', ''))
     
     if event_props.get('status'):
         st.caption("📌 狀態")
@@ -144,23 +146,19 @@ if not is_admin:
         with st.form("booking_form"):
             c1, c2 = st.columns(2)
             name = c1.text_input("預約人大名 (必填)")
-            # 新增：與會人輸入框，特別標註選填
-            attendees = c2.text_input("與會人 (選填，如有多人請用逗號隔開)")
-            
+            attendees = c2.text_input("與會人 (選填)")
             c3, c4 = st.columns(2)
             date_val = c3.date_input("日期", min_value=datetime.today())
             loc = c4.selectbox("地點", LOCATION_OPTIONS)
-            
             c5, c6 = st.columns(2)
             s_time = c5.selectbox("開始", TIME_OPTIONS, index=0)
             e_time = c6.selectbox("結束", TIME_OPTIONS, index=2)
-            
-            content = st.text_input("會議內容 (必填)")
+            content = st.text_input("內容 (必填)")
             
             if st.form_submit_button("送出", use_container_width=True):
                 load_data.clear()
                 df = load_data()
-                if not name or not content: st.error("❌ 請填寫必填欄位 (大名、內容)")
+                if not name or not content: st.error("❌ 請填寫必填欄位")
                 elif s_time >= e_time: st.error("❌ 時間錯誤")
                 else:
                     conflict = check_overlap(df, date_val, s_time, e_time)
@@ -171,32 +169,28 @@ if not is_admin:
                             "開始時間": s_time.strftime("%H:%M:%S"),
                             "結束時間": e_time.strftime("%H:%M:%S"),
                             "大名": name,
-                            "與會人": attendees, # 存入與會人
+                            "與會人": attendees,
                             "會議地點": loc,
                             "預約內容": content,
                             "登記時間": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             "狀態": "待審核"
                         }
                         save_data(pd.concat([df, pd.DataFrame([new_row])], ignore_index=True))
-                        st.success("✅ 申請已送出！")
-                        st.rerun()
+                        # 🔥 呼叫成功彈窗，而不是直接重新整理
+                        show_success_message()
+
 else:
     st.sidebar.success("管理員已登入")
     st.markdown(f"<h3 style='color:{THEME_COLOR}'>📋 審核後台</h3>", unsafe_allow_html=True)
     load_data.clear()
     df = load_data()
     if not df.empty:
-        # 管理員表格也要顯示與會人
-        edited_df = st.data_editor(
-            df,
-            column_config={
-                "狀態": st.column_config.SelectboxColumn("狀態", options=["待審核", "核准", "拒絕"], required=True),
-                "會議地點": st.column_config.TextColumn(disabled=True),
-                "與會人": st.column_config.TextColumn("與會人"),
-                "刪除": st.column_config.CheckboxColumn(required=True)
-            },
-            num_rows="dynamic", key="admin", use_container_width=True
-        )
+        edited_df = st.data_editor(df, column_config={
+            "狀態": st.column_config.SelectboxColumn("狀態", options=["待審核", "核准", "拒絕"], required=True),
+            "會議地點": st.column_config.TextColumn(disabled=True),
+            "與會人": st.column_config.TextColumn("與會人"),
+            "刪除": st.column_config.CheckboxColumn(required=True)
+        }, num_rows="dynamic", key="admin", use_container_width=True)
         if st.button("💾 儲存變更", type="primary", use_container_width=True):
             save_data(edited_df)
             st.success("已更新")
@@ -214,7 +208,6 @@ if not df.empty and '日期' in df.columns:
         try:
             status = row.get('狀態', '核准')
             if not is_admin and status != '核准': continue
-            
             clean_date = str(row['日期']).replace('/', '-').strip()
             start_t = fix_time(row['開始時間'])
             end_t = fix_time(row['結束時間'])
@@ -236,13 +229,8 @@ if not df.empty and '日期' in df.columns:
                 "borderColor": bg_color,
                 "textColor": "#FFFFFF",
                 "extendedProps": {
-                    "location": loc,
-                    "name": row['大名'],
-                    # 傳送與會人資料給彈跳視窗
-                    "attendees": row.get('與會人', ''),
-                    "content": row['預約內容'],
-                    "status": status,
-                    "pretty_time": f"{start_t[:5]} - {end_t[:5]}"
+                    "location": loc, "name": row['大名'], "attendees": row.get('與會人', ''),
+                    "content": row['預約內容'], "status": status, "pretty_time": f"{start_t[:5]} - {end_t[:5]}"
                 }
             })
         except: continue
@@ -250,14 +238,10 @@ if not df.empty and '日期' in df.columns:
 calendar_options = {
     "initialView": "listWeek" if view_mode == "📱 列表" else "timeGridWeek",
     "headerToolbar": {"left": "today prev,next", "center": "title", "right": ""},
-    "height": "auto",
-    "slotMinTime": "08:00:00",
-    "slotMaxTime": "19:00:00",
-    "allDaySlot": False
+    "height": "auto", "slotMinTime": "08:00:00", "slotMaxTime": "19:00:00", "allDaySlot": False
 }
 
 calendar_state = calendar(events=events, options=calendar_options)
-
 if calendar_state.get("eventClick"):
     show_event_details(calendar_state["eventClick"]["event"]["extendedProps"])
 
