@@ -13,8 +13,12 @@ from email.mime.multipart import MIMEMultipart
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
 ADMIN_PASSWORD = "8888"
 
-# --- 選項設定 ---
-LOCATION_OPTIONS = ["小會議室", "大會議室", "洽談室Ａ", "洽談室Ｂ", "行銷部辦公室"]
+# --- 🔥 更新：地點選項 (已加入新地點) ---
+LOCATION_OPTIONS = [
+    "小會議室", "大會議室", "洽談室Ａ", "洽談室Ｂ", "行銷部辦公室", 
+    "崇德門市", "生產中心", "物流中心", "線上", "外部"
+]
+
 THEME_COLOR = "#D4A59A" # 主題色
 
 TIME_OPTIONS = []
@@ -62,11 +66,10 @@ def fix_time(t_str):
     try: return datetime.strptime(t_str, "%H:%M:%S").strftime("%H:%M:%S")
     except: return None
 
-# --- 🔥 改良版：寄信函數 (會顯示錯誤) ---
+# --- 寄信函數 ---
 def send_notification_email(booking_data):
-    # 1. 檢查 Secrets 是否載入
     if "email" not in st.secrets:
-        st.error("❌ 系統找不到 Email 設定！請檢查 Secrets 是否有 [email] 區塊。")
+        st.error("❌ 系統找不到 Email 設定！")
         return
 
     sender_email = st.secrets["email"]["sender"]
@@ -103,10 +106,8 @@ def send_notification_email(booking_data):
         text = msg.as_string()
         server.sendmail(sender_email, receiver_email, text)
         server.quit()
-        # 寄信成功顯示小提示
         st.toast("📧 通知信已發送！", icon="✅")
     except Exception as e:
-        # 寄信失敗直接顯示紅字錯誤
         st.error(f"❌ Email 發送失敗: {e}")
 
 @st.cache_data(ttl=5)
@@ -221,10 +222,7 @@ if not is_admin:
                             "狀態": "待審核"
                         }
                         save_data(pd.concat([df, pd.DataFrame([new_row])], ignore_index=True))
-                        
-                        # 🔥 這裡寄信，並在畫面上顯示結果
                         send_notification_email(new_row)
-                        
                         show_success_message()
 
 else:
