@@ -5,6 +5,9 @@ from streamlit_calendar import calendar
 import gspread
 from gspread_dataframe import set_with_dataframe, get_as_dataframe
 from PIL import Image
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # --- ⚠️ 你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
@@ -59,6 +62,53 @@ def fix_time(t_str):
     try: return datetime.strptime(t_str, "%H:%M:%S").strftime("%H:%M:%S")
     except: return None
 
+# --- 🔥 改良版：寄信函數 (會顯示錯誤) ---
+def send_notification_email(booking_data):
+    # 1. 檢查 Secrets 是否載入
+    if "email" not in st.secrets:
+        st.error("❌ 系統找不到 Email 設定！請檢查 Secrets 是否有 [email] 區塊。")
+        return
+
+    sender_email = st.secrets["email"]["sender"]
+    sender_password = st.secrets["email"]["password"]
+    receiver_email = st.secrets["email"]["receiver"]
+
+    subject = f"【會議預約通知】{booking_data['大名']} 申請了會議"
+    
+    body = f"""
+    <h3>收到新的會議室預約申請</h3>
+    <p>請管理員登入系統進行審核。</p>
+    <hr>
+    <ul>
+        <li><b>預約人：</b> {booking_data['大名']}</li>
+        <li><b>日期：</b> {booking_data['日期']}</li>
+        <li><b>時間：</b> {booking_data['開始時間']} ~ {booking_data['結束時間']}</li>
+        <li><b>地點：</b> {booking_data['會議地點']}</li>
+        <li><b>內容：</b> {booking_data['預約內容']}</li>
+        <li><b>與會人：</b> {booking_data['與會人']}</li>
+    </ul>
+    <p><a href="https://share.streamlit.io">點此前往預約系統審核</a></p>
+    """
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, receiver_email, text)
+        server.quit()
+        # 寄信成功顯示小提示
+        st.toast("📧 通知信已發送！", icon="✅")
+    except Exception as e:
+        # 寄信失敗直接顯示紅字錯誤
+        st.error(f"❌ Email 發送失敗: {e}")
+
 @st.cache_data(ttl=5)
 def load_data():
     ws = get_worksheet()
@@ -98,24 +148,19 @@ def check_overlap(df, check_date, start_t, end_t):
     if not overlap.empty: return overlap.iloc[0]['大名']
     return None
 
-# --- 🔥 新增：成功預約的感謝彈窗 ---
+# --- 彈跳視窗：成功訊息 ---
 @st.dialog("🎉 申請成功！")
 def show_success_message():
     st.subheader("感謝您的預約")
-    st.write("主管審核通過後，將會自動同步至行事曆。")
-    
-    # 顯示你的感謝圖片
+    st.write("已通知主管進行審核。")
     try:
         img = Image.open("thank_you.jpg")
         st.image(img, use_container_width=True)
-    except:
-        st.caption("(找不到感謝圖片，但預約已成功)")
-        
-    # 按下這個按鈕才會重新整理
+    except: pass
     if st.button("好的，我知道了", type="primary"):
         st.rerun()
 
-# --- 彈跳視窗：顯示詳情 ---
+# --- 彈跳視窗：詳情 ---
 @st.dialog("📋 會議詳細資訊")
 def show_event_details(event_props):
     st.markdown(f"### **{event_props.get('content', '無內容')}**")
@@ -176,7 +221,10 @@ if not is_admin:
                             "狀態": "待審核"
                         }
                         save_data(pd.concat([df, pd.DataFrame([new_row])], ignore_index=True))
-                        # 🔥 呼叫成功彈窗，而不是直接重新整理
+                        
+                        # 🔥 這裡寄信，並在畫面上顯示結果
+                        send_notification_email(new_row)
+                        
                         show_success_message()
 
 else:
