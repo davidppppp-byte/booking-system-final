@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from streamlit_calendar import calendar
 import gspread
 from gspread_dataframe import set_with_dataframe, get_as_dataframe
@@ -55,7 +55,6 @@ JOKES_DB = [
 ]
 
 def get_daily_joke():
-    # 根據「今天的日期」選笑話，保證整天都一樣，隔天會變
     day_of_year = datetime.now().timetuple().tm_yday
     joke_index = day_of_year % len(JOKES_DB)
     return JOKES_DB[joke_index]
@@ -69,20 +68,27 @@ try:
 except:
     st.title("📅 行銷部會議預約系統")
 
-# --- 😂 每日一笑 (顯眼版) ---
-# 使用 st.info 會產生一個有顏色的框框，非常顯眼
+# --- 😂 每日一笑 ---
 st.info(f"💡 **每日一笑：** {get_daily_joke()}")
 
-# --- 🎨 CSS 優化 ---
+# --- 🎨 CSS 優化 (修復按鈕點擊問題) ---
 st.markdown(f"""
     <style>
     .stApp {{ background-color: {BG_COLOR}; }}
+    
+    /* 一般按鈕 (送出、登出) 保持美化 */
     .stButton>button {{
         background: linear-gradient(135deg, {THEME_COLOR} 0%, #1A5276 100%);
         color: white; border: None; border-radius: 8px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.3s ease;
     }}
     .stButton>button:hover {{ transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }}
+    
+    /* ⚠️ 關鍵修復：不要干擾 Radio Button (切換模式按鈕) 的樣式，讓它恢復預設行為 */
+    div[role="radiogroup"] {{
+        background-color: transparent !important;
+    }}
+
     div[data-testid="stExpander"] {{
         background-color: {CARD_COLOR}; border-radius: 10px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #E0E0E0;
@@ -258,12 +264,26 @@ else:
 
 st.markdown(f"<hr style='border-top: 2px solid {THEME_COLOR};'>", unsafe_allow_html=True)
 
-# --- 🔥 行事曆邏輯修復 ---
+# --- 行事曆 ---
 df = load_data()
-view_mode = st.radio("檢視", ["📱 列表", "💻 週視圖"], horizontal=True)
-events = []
+# 🔥 將 view_mode 存入 session_state 確保不重置
+if "view_mode" not in st.session_state:
+    st.session_state["view_mode"] = "📱 列表"
 
-# 初始化記憶日期 (如果沒有記憶，就用今天)
+# 使用 callback 更新狀態
+def update_view_mode():
+    st.session_state["view_mode"] = st.session_state.temp_view_mode
+
+view_mode = st.radio(
+    "檢視", 
+    ["📱 列表", "💻 週視圖"], 
+    horizontal=True, 
+    index=0 if st.session_state["view_mode"] == "📱 列表" else 1,
+    key="temp_view_mode",
+    on_change=update_view_mode
+)
+
+events = []
 if "calendar_date" not in st.session_state:
     st.session_state["calendar_date"] = datetime.today().isoformat()
 
@@ -288,25 +308,19 @@ if not df.empty and '日期' in df.columns:
         except: continue
 
 calendar_options = {
-    "initialView": "listWeek" if view_mode == "📱 列表" else "timeGridWeek",
+    "initialView": "listWeek" if st.session_state["view_mode"] == "📱 列表" else "timeGridWeek",
     "headerToolbar": {"left": "today prev,next", "center": "title", "right": ""},
     "height": "auto", "slotMinTime": "08:00:00", "slotMaxTime": "19:00:00", "allDaySlot": False,
-    # 這裡綁定 session_state，讓它記住日期
     "initialDate": st.session_state["calendar_date"],
 }
 
-# 監聽 datesSet 事件
 calendar_state = calendar(events=events, options=calendar_options, key="calendar", callbacks=["datesSet"])
 
-# 🔥 關鍵：如果行事曆傳回新的日期，就存起來並「重新整理網頁」
-# 這樣下次進來時，initialDate 就會是新的日期
 if calendar_state.get("datesSet"):
     new_start_date = calendar_state["datesSet"]["startStr"]
-    # 只有當日期真的變了，才更新並重整
-    # 注意：這裡我們只取日期部分比對，避免無限迴圈
     if new_start_date.split("T")[0] != st.session_state["calendar_date"].split("T")[0]:
         st.session_state["calendar_date"] = new_start_date
-        st.rerun() # 強制刷新，讓 initialDate 生效
+        st.rerun()
 
 if calendar_state.get("eventClick"):
     show_event_details(calendar_state["eventClick"]["event"]["extendedProps"])
