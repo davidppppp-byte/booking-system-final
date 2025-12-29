@@ -13,18 +13,22 @@ from email.mime.multipart import MIMEMultipart
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
 ADMIN_PASSWORD = "8888"
 
-# --- 🔥 更新：地點選項 (已加入新地點) ---
+# --- 選項設定 ---
 LOCATION_OPTIONS = [
     "小會議室", "大會議室", "洽談室Ａ", "洽談室Ｂ", "行銷部辦公室", 
     "崇德門市", "生產中心", "物流中心", "線上", "外部"
 ]
 
-THEME_COLOR = "#D4A59A" # 主題色
+# --- 🎨 UI 設定：科技感配色 (Tech Blue) ---
+THEME_COLOR = "#2980B9"  # 科技藍 (專業、信任感)
+BG_COLOR = "#F8F9FA"     # 極淺灰背景 (護眼)
+CARD_COLOR = "#FFFFFF"   # 卡片白底
 
 TIME_OPTIONS = []
-for h in range(8, 17):
+# 修改：範圍改成 8 點到 17 點 (包含 17:00)
+for h in range(8, 18): 
     for m in [0, 30]:
-        if h == 16 and m > 30: break
+        if h == 17 and m > 0: break # 17:00 後就不加 17:30 了
         TIME_OPTIONS.append(time(h, m))
 
 # --- 頁面設定 ---
@@ -39,11 +43,45 @@ try:
 except:
     st.title("📅 行銷部會議預約系統")
 
+# --- 🎨 CSS 優化：科技感介面 ---
 st.markdown(f"""
     <style>
-    .stButton>button {{ background-color: {THEME_COLOR}; color: white; border: None; }}
-    .stButton>button:hover {{ background-color: #B88B81; }}
+    /* 全站背景 */
+    .stApp {{
+        background-color: {BG_COLOR};
+    }}
+    
+    /* 按鈕樣式 (科技藍漸層) */
+    .stButton>button {{
+        background: linear-gradient(135deg, {THEME_COLOR} 0%, #1A5276 100%);
+        color: white;
+        border: None;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }}
+    .stButton>button:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }}
+    
+    /* 輸入框與卡片優化 (懸浮感) */
+    div[data-testid="stExpander"] {{
+        background-color: {CARD_COLOR};
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border: 1px solid #E0E0E0;
+    }}
+    
+    /* 連結顏色 */
     a {{ color: {THEME_COLOR}; }}
+    
+    /* 標題裝飾 */
+    h1, h2, h3 {{
+        font-family: 'Helvetica Neue', sans-serif;
+        font-weight: 600;
+        color: #2C3E50;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -79,18 +117,22 @@ def send_notification_email(booking_data):
     subject = f"【會議預約通知】{booking_data['大名']} 申請了會議"
     
     body = f"""
-    <h3>收到新的會議室預約申請</h3>
-    <p>請管理員登入系統進行審核。</p>
-    <hr>
-    <ul>
-        <li><b>預約人：</b> {booking_data['大名']}</li>
-        <li><b>日期：</b> {booking_data['日期']}</li>
-        <li><b>時間：</b> {booking_data['開始時間']} ~ {booking_data['結束時間']}</li>
-        <li><b>地點：</b> {booking_data['會議地點']}</li>
-        <li><b>內容：</b> {booking_data['預約內容']}</li>
-        <li><b>與會人：</b> {booking_data['與會人']}</li>
-    </ul>
-    <p><a href="https://share.streamlit.io">點此前往預約系統審核</a></p>
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+        <h3 style="color: {THEME_COLOR};">收到新的會議室預約申請</h3>
+        <p>請管理員登入系統進行審核。</p>
+        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; border-left: 4px solid {THEME_COLOR};">
+            <ul style="list-style-type: none; padding: 0;">
+                <li style="margin-bottom: 8px;"><b>👤 預約人：</b> {booking_data['大名']}</li>
+                <li style="margin-bottom: 8px;"><b>📅 日期：</b> {booking_data['日期']}</li>
+                <li style="margin-bottom: 8px;"><b>⏰ 時間：</b> {booking_data['開始時間']} ~ {booking_data['結束時間']}</li>
+                <li style="margin-bottom: 8px;"><b>📍 地點：</b> {booking_data['會議地點']}</li>
+                <li style="margin-bottom: 8px;"><b>📝 內容：</b> {booking_data['預約內容']}</li>
+                <li style="margin-bottom: 8px;"><b>👥 與會人：</b> {booking_data['與會人']}</li>
+            </ul>
+        </div>
+        <br>
+        <a href="https://share.streamlit.io" style="background-color: {THEME_COLOR}; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">前往審核</a>
+    </div>
     """
 
     msg = MIMEMultipart()
@@ -149,7 +191,7 @@ def check_overlap(df, check_date, start_t, end_t):
     if not overlap.empty: return overlap.iloc[0]['大名']
     return None
 
-# --- 彈跳視窗：成功訊息 ---
+# --- 彈跳視窗 ---
 @st.dialog("🎉 申請成功！")
 def show_success_message():
     st.subheader("感謝您的預約")
@@ -161,7 +203,6 @@ def show_success_message():
     if st.button("好的，我知道了", type="primary"):
         st.rerun()
 
-# --- 彈跳視窗：詳情 ---
 @st.dialog("📋 會議詳細資訊")
 def show_event_details(event_props):
     st.markdown(f"### **{event_props.get('content', '無內容')}**")
@@ -184,10 +225,43 @@ def show_event_details(event_props):
 
 # --- 主程式 ---
 st.sidebar.header("🔒 管理員專區")
-admin_pwd = st.sidebar.text_input("輸入密碼", type="password")
+
+# 使用 session_state 來管理密碼輸入框的狀態，方便做登出功能
+if "admin_pass_input" not in st.session_state:
+    st.session_state["admin_pass_input"] = ""
+
+def logout():
+    st.session_state["admin_pass_input"] = "" # 清空密碼
+    
+# 密碼輸入框
+admin_pwd = st.sidebar.text_input("輸入密碼", type="password", key="admin_pass_input")
 is_admin = admin_pwd == ADMIN_PASSWORD
 
-if not is_admin:
+# --- 1. 管理員介面 ---
+if is_admin:
+    st.sidebar.success("✅ 管理員已登入")
+    # 新增：登出按鈕
+    if st.sidebar.button("🚪 登出 / 回首頁"):
+        logout()
+        st.rerun()
+
+    st.markdown(f"<h3 style='color:{THEME_COLOR}'>📋 審核後台</h3>", unsafe_allow_html=True)
+    load_data.clear()
+    df = load_data()
+    if not df.empty:
+        edited_df = st.data_editor(df, column_config={
+            "狀態": st.column_config.SelectboxColumn("狀態", options=["待審核", "核准", "拒絕"], required=True),
+            "會議地點": st.column_config.TextColumn(disabled=True),
+            "與會人": st.column_config.TextColumn("與會人"),
+            "刪除": st.column_config.CheckboxColumn(required=True)
+        }, num_rows="dynamic", key="admin", use_container_width=True)
+        if st.button("💾 儲存變更", type="primary", use_container_width=True):
+            save_data(edited_df)
+            st.success("已更新")
+            st.rerun()
+
+# --- 2. 申請介面 (非管理員顯示) ---
+else:
     with st.expander("➕ 申請預約 (需審核)", expanded=True):
         with st.form("booking_form"):
             c1, c2 = st.columns(2)
@@ -198,6 +272,7 @@ if not is_admin:
             loc = c4.selectbox("地點", LOCATION_OPTIONS)
             c5, c6 = st.columns(2)
             s_time = c5.selectbox("開始", TIME_OPTIONS, index=0)
+            # 預設結束時間往後推一點，避免與開始時間相同
             e_time = c6.selectbox("結束", TIME_OPTIONS, index=2)
             content = st.text_input("內容 (必填)")
             
@@ -205,7 +280,7 @@ if not is_admin:
                 load_data.clear()
                 df = load_data()
                 if not name or not content: st.error("❌ 請填寫必填欄位")
-                elif s_time >= e_time: st.error("❌ 時間錯誤")
+                elif s_time >= e_time: st.error("❌ 時間錯誤：結束時間必須晚於開始時間")
                 else:
                     conflict = check_overlap(df, date_val, s_time, e_time)
                     if conflict: st.error(f"❌ 衝突：該時段已被「{conflict}」預約")
@@ -225,23 +300,6 @@ if not is_admin:
                         send_notification_email(new_row)
                         show_success_message()
 
-else:
-    st.sidebar.success("管理員已登入")
-    st.markdown(f"<h3 style='color:{THEME_COLOR}'>📋 審核後台</h3>", unsafe_allow_html=True)
-    load_data.clear()
-    df = load_data()
-    if not df.empty:
-        edited_df = st.data_editor(df, column_config={
-            "狀態": st.column_config.SelectboxColumn("狀態", options=["待審核", "核准", "拒絕"], required=True),
-            "會議地點": st.column_config.TextColumn(disabled=True),
-            "與會人": st.column_config.TextColumn("與會人"),
-            "刪除": st.column_config.CheckboxColumn(required=True)
-        }, num_rows="dynamic", key="admin", use_container_width=True)
-        if st.button("💾 儲存變更", type="primary", use_container_width=True):
-            save_data(edited_df)
-            st.success("已更新")
-            st.rerun()
-
 st.markdown(f"<hr style='border-top: 2px solid {THEME_COLOR};'>", unsafe_allow_html=True)
 
 # --- 行事曆 ---
@@ -260,7 +318,7 @@ if not df.empty and '日期' in df.columns:
             if not start_t or not end_t: continue
             
             loc = row.get('會議地點', '未指定')
-            bg_color = THEME_COLOR
+            bg_color = THEME_COLOR # 預設科技藍
             if status == '待審核': bg_color = "#F39C12"
             elif status == '拒絕': bg_color = "#7F8C8D"
 
@@ -284,10 +342,17 @@ if not df.empty and '日期' in df.columns:
 calendar_options = {
     "initialView": "listWeek" if view_mode == "📱 列表" else "timeGridWeek",
     "headerToolbar": {"left": "today prev,next", "center": "title", "right": ""},
-    "height": "auto", "slotMinTime": "08:00:00", "slotMaxTime": "19:00:00", "allDaySlot": False
+    "height": "auto", 
+    "slotMinTime": "08:00:00", 
+    "slotMaxTime": "19:00:00", 
+    "allDaySlot": False,
+    # 🔥 關鍵修正：加入這行讓週次切換不亂跳
+    "datesSet": None 
 }
 
-calendar_state = calendar(events=events, options=calendar_options)
+# 🔥 關鍵修正：加入 key="calendar" 確保元件穩定，不會一直重置
+calendar_state = calendar(events=events, options=calendar_options, key="calendar")
+
 if calendar_state.get("eventClick"):
     show_event_details(calendar_state["eventClick"]["event"]["extendedProps"])
 
