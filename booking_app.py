@@ -9,7 +9,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import random
-import os # 新增這行以檢查檔案是否存在
+import os
 
 # --- ⚠️ 你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
@@ -62,13 +62,12 @@ def get_daily_joke():
     return JOKES_DB[joke_index]
 
 # --- 樣式與 Logo ---
-# 嘗試載入 logo，支援多種副檔名
 logo_file = None
 for ext in ["png", "jpg", "jpeg"]:
     if os.path.exists(f"logo.{ext}"):
         logo_file = f"logo.{ext}"
         break
-    elif os.path.exists(f"logo_大頭貼.{ext}"): # 也試試看原始檔名
+    elif os.path.exists(f"logo_大頭貼.{ext}"):
         logo_file = f"logo_大頭貼.{ext}"
         break
 
@@ -83,11 +82,9 @@ if logo_file:
 else:
     st.title("📅 行銷部會議預約系統")
 
-# --- 📸 新增：部門合照 (附帶偵探功能) ---
+# --- 📸 部門合照 ---
 team_photo_file = None
-# 這裡列出可能的檔名
 possible_filenames = ["team_photo.jpg", "team_photo.png", "team_photo.jpeg", "Gemini_Generated_Image_1ammmg1ammmg1amm.jpg"]
-
 for filename in possible_filenames:
     if os.path.exists(filename):
         team_photo_file = filename
@@ -97,24 +94,16 @@ if team_photo_file:
     try:
         team_photo = Image.open(team_photo_file) 
         st.image(team_photo, use_container_width=True, caption="行銷部 Team Building")
-    except Exception as e:
-        st.error(f"照片讀取錯誤: {e}")
-else:
-    # 找不到照片時，顯示提示訊息方便除錯
-    with st.expander("ℹ️ 還沒看到合照嗎？點這裡查看原因"):
-        st.warning("系統找不到照片，請確認您已將照片上傳到 GitHub，且檔名為 team_photo.jpg")
-        st.write("🔍 目前系統偵測到的檔案列表：")
-        st.code(os.listdir()) # 顯示所有檔案，方便核對檔名
+    except: pass
 
 # --- 😂 每日一笑 ---
 st.info(f"💡 **每日一笑：** {get_daily_joke()}")
 
-# --- 🎨 CSS 優化 (修復按鈕點擊問題) ---
+# --- 🎨 CSS 優化 ---
 st.markdown(f"""
     <style>
     .stApp {{ background-color: {BG_COLOR}; }}
     
-    /* 一般按鈕 (送出、登出) 保持美化 */
     .stButton>button {{
         background: linear-gradient(135deg, {THEME_COLOR} 0%, #1A5276 100%);
         color: white; border: None; border-radius: 8px;
@@ -122,9 +111,6 @@ st.markdown(f"""
     }}
     .stButton>button:hover {{ transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }}
     
-    /* ⚠️ 關鍵修復：把針對 radio group 的背景設定拿掉，避免蓋住點擊區域 */
-    /* div[role="radiogroup"] {{ background-color: transparent !important; }} */
-
     div[data-testid="stExpander"] {{
         background-color: {CARD_COLOR}; border-radius: 10px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #E0E0E0;
@@ -132,11 +118,7 @@ st.markdown(f"""
     a {{ color: {THEME_COLOR}; }}
     h1, h2, h3 {{ font-family: 'Helvetica Neue', sans-serif; font-weight: 600; color: #2C3E50; }}
     
-    /* 照片圓角與陰影 */
-    img {{
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }}
+    img {{ border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -233,20 +215,16 @@ def check_overlap(df, check_date, start_t, end_t):
 def show_success_message():
     st.subheader("感謝您的預約")
     st.write("已通知主管進行審核。")
-    
-    # 嘗試載入 thank_you 圖片，支援多種副檔名
     thank_you_file = None
     for ext in ["jpg", "jpeg", "png"]:
         if os.path.exists(f"thank_you.{ext}"):
             thank_you_file = f"thank_you.{ext}"
             break
-            
     if thank_you_file:
         try:
             img = Image.open(thank_you_file)
             st.image(img, use_container_width=True)
         except: pass
-        
     if st.button("好的，我知道了", type="primary"): st.rerun()
 
 @st.dialog("📋 會議詳細資訊")
@@ -318,21 +296,23 @@ st.markdown(f"<hr style='border-top: 2px solid {THEME_COLOR};'>", unsafe_allow_h
 
 # --- 行事曆 ---
 df = load_data()
-# 🔥 將 view_mode 存入 session_state 確保不重置
+
+# 🔥 修正：使用更穩定的切換邏輯
 if "view_mode" not in st.session_state:
     st.session_state["view_mode"] = "📱 列表"
 
-# 使用 callback 更新狀態
-def update_view_mode():
-    st.session_state["view_mode"] = st.session_state.temp_view_mode
+# 這個 callback 負責把按鈕的值存進 view_mode，然後強制重整
+def update_view():
+    st.session_state["view_mode"] = st.session_state["view_mode_selector"]
 
-view_mode = st.radio(
-    "檢視", 
+# 顯示切換按鈕
+st.radio(
+    "檢視模式", 
     ["📱 列表", "💻 週視圖"], 
     horizontal=True, 
     index=0 if st.session_state["view_mode"] == "📱 列表" else 1,
-    key="temp_view_mode",
-    on_change=update_view_mode
+    key="view_mode_selector",
+    on_change=update_view # 當使用者點擊時，觸發 update_view
 )
 
 events = []
@@ -359,14 +339,18 @@ if not df.empty and '日期' in df.columns:
             })
         except: continue
 
+# 🔥 關鍵：根據 session_state 決定行事曆類型，並且改變 key 強制重繪
+current_view = "listWeek" if st.session_state["view_mode"] == "📱 列表" else "timeGridWeek"
+
 calendar_options = {
-    "initialView": "listWeek" if st.session_state["view_mode"] == "📱 列表" else "timeGridWeek",
+    "initialView": current_view,
     "headerToolbar": {"left": "today prev,next", "center": "title", "right": ""},
     "height": "auto", "slotMinTime": "08:00:00", "slotMaxTime": "19:00:00", "allDaySlot": False,
     "initialDate": st.session_state["calendar_date"],
 }
 
-calendar_state = calendar(events=events, options=calendar_options, key="calendar", callbacks=["datesSet"])
+# 讓 key 包含 view_mode，這樣切換模式時，舊的行事曆會被銷毀，新的會被建立，解決卡住問題
+calendar_state = calendar(events=events, options=calendar_options, key=f"calendar_{current_view}", callbacks=["datesSet"])
 
 if calendar_state.get("datesSet"):
     new_start_date = calendar_state["datesSet"]["startStr"]
