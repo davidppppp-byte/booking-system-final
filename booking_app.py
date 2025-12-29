@@ -331,8 +331,8 @@ calendar_options = {
     "initialDate": st.session_state["calendar_date"],
 }
 
-# 讓 key 包含 view_mode，這樣切換模式時，舊的行事曆會被銷毀，新的會被建立，解決卡住問題
-calendar_state = calendar(events=events, options=calendar_options, key=f"calendar_{current_view}", callbacks=["datesSet"])
+# 🔥 關鍵修正：callbacks 加入 "eventClick"，同時保留 "datesSet" (日期記憶)
+calendar_state = calendar(events=events, options=calendar_options, key=f"calendar_{current_view}", callbacks=["datesSet", "eventClick"])
 
 if calendar_state.get("datesSet"):
     new_start_date = calendar_state["datesSet"]["startStr"]
