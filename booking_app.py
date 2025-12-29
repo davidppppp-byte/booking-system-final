@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 from streamlit_calendar import calendar
 import gspread
 from gspread_dataframe import set_with_dataframe, get_as_dataframe
@@ -34,10 +34,10 @@ for h in range(8, 18):
 # --- 頁面設定 ---
 st.set_page_config(page_title="行銷部會議預約", page_icon="📅", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 😂 每日笑話資料庫 (自動輪播) ---
+# --- 😂 每日笑話資料庫 ---
 JOKES_DB = [
     "為什麼數學書很難過？因為它有太多的問題。",
-    "什麼東西早上四條腿，中午兩條腿，晚上三條腿？人（嬰兒、成人、老人拐杖）。",
+    "什麼東西早上四條腿，中午兩條腿，晚上三條腿？人。",
     "有一隻公鹿跑得很快，後來它變成了什麼？高速公鹿。",
     "皮卡丘站起來變什麼？皮卡兵。",
     "為什麼飛機撞不到星星？因為星星會閃。",
@@ -47,11 +47,15 @@ JOKES_DB = [
     "小明去便利商店買飲料，為什麼店員不理他？因為他買的是「去冰」。",
     "猴子最討厭什麼線？平行線 (因為沒有相交/香蕉)。",
     "哪種花最沒力？茉莉花 (好一朵美麗/沒力 的茉莉花)。",
-    "什麼卡通人物最黑暗？哆啦A夢 (因為他手伸不見五指)。"
+    "什麼卡通人物最黑暗？哆啦A夢 (因為他手伸不見五指)。",
+    "只有哪一個英文字母會發光？ F (F光了 / 發光了)",
+    "哪一個英文字母最酷？ C (西裝褲 / C裝褲)",
+    "皮卡丘走路？皮卡乒乓 (皮卡丘乒乓/走路聲)",
+    "蛤蜊的兄弟是誰？ 蛤蜊葛格 (蛤蜊哥哥)"
 ]
 
 def get_daily_joke():
-    # 利用「一年中的第幾天」來決定顯示哪則笑話，保證每天不一樣，且大家看到的一樣
+    # 根據「今天的日期」選笑話，保證整天都一樣，隔天會變
     day_of_year = datetime.now().timetuple().tm_yday
     joke_index = day_of_year % len(JOKES_DB)
     return JOKES_DB[joke_index]
@@ -65,13 +69,9 @@ try:
 except:
     st.title("📅 行銷部會議預約系統")
 
-# --- 顯示每日笑話 (穿插在標題下方) ---
-st.markdown(f"""
-    <div style="background-color: #EAF2F8; padding: 10px; border-radius: 8px; border-left: 5px solid {THEME_COLOR}; margin-bottom: 20px;">
-        <span style="font-weight: bold; color: {THEME_COLOR};">💡 每日一笑：</span>
-        <span style="color: #555;">{get_daily_joke()}</span>
-    </div>
-""", unsafe_allow_html=True)
+# --- 😂 每日一笑 (顯眼版) ---
+# 使用 st.info 會產生一個有顏色的框框，非常顯眼
+st.info(f"💡 **每日一笑：** {get_daily_joke()}")
 
 # --- 🎨 CSS 優化 ---
 st.markdown(f"""
@@ -258,12 +258,12 @@ else:
 
 st.markdown(f"<hr style='border-top: 2px solid {THEME_COLOR};'>", unsafe_allow_html=True)
 
-# --- 🔥 行事曆邏輯修復：記住日期 ---
+# --- 🔥 行事曆邏輯修復 ---
 df = load_data()
 view_mode = st.radio("檢視", ["📱 列表", "💻 週視圖"], horizontal=True)
 events = []
 
-# 初始化 session state 中的日期
+# 初始化記憶日期 (如果沒有記憶，就用今天)
 if "calendar_date" not in st.session_state:
     st.session_state["calendar_date"] = datetime.today().isoformat()
 
@@ -291,20 +291,22 @@ calendar_options = {
     "initialView": "listWeek" if view_mode == "📱 列表" else "timeGridWeek",
     "headerToolbar": {"left": "today prev,next", "center": "title", "right": ""},
     "height": "auto", "slotMinTime": "08:00:00", "slotMaxTime": "19:00:00", "allDaySlot": False,
-    # 🔥 設定初始日期為記憶中的日期
+    # 這裡綁定 session_state，讓它記住日期
     "initialDate": st.session_state["calendar_date"],
 }
 
-# 🔥 加入 callbacks 監聽日期變化
+# 監聽 datesSet 事件
 calendar_state = calendar(events=events, options=calendar_options, key="calendar", callbacks=["datesSet"])
 
-# 🔥 當行事曆切換日期時，把新日期存起來
+# 🔥 關鍵：如果行事曆傳回新的日期，就存起來並「重新整理網頁」
+# 這樣下次進來時，initialDate 就會是新的日期
 if calendar_state.get("datesSet"):
     new_start_date = calendar_state["datesSet"]["startStr"]
-    # 只有當日期真的變了才存，避免無限迴圈
-    # 注意：這裡我們不強制 rerun，讓它自然記住就好，下次操作時就不會跳回今天
-    if new_start_date != st.session_state["calendar_date"]:
+    # 只有當日期真的變了，才更新並重整
+    # 注意：這裡我們只取日期部分比對，避免無限迴圈
+    if new_start_date.split("T")[0] != st.session_state["calendar_date"].split("T")[0]:
         st.session_state["calendar_date"] = new_start_date
+        st.rerun() # 強制刷新，讓 initialDate 生效
 
 if calendar_state.get("eventClick"):
     show_event_details(calendar_state["eventClick"]["event"]["extendedProps"])
