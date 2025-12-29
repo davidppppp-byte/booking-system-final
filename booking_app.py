@@ -9,6 +9,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import random
+import os # 新增這行以檢查檔案是否存在
 
 # --- ⚠️ 你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
@@ -61,21 +62,44 @@ def get_daily_joke():
     return JOKES_DB[joke_index]
 
 # --- 樣式與 Logo ---
-try:
-    logo = Image.open("logo.png")
-    col_logo, col_title = st.columns([1, 5])
-    with col_logo: st.image(logo, width=100)
-    with col_title: st.title("📅 行銷部會議預約系統")
-except:
+# 嘗試載入 logo，支援多種副檔名
+logo_file = None
+for ext in ["png", "jpg", "jpeg"]:
+    if os.path.exists(f"logo.{ext}"):
+        logo_file = f"logo.{ext}"
+        break
+    elif os.path.exists(f"logo_大頭貼.{ext}"): # 也試試看原始檔名
+        logo_file = f"logo_大頭貼.{ext}"
+        break
+
+if logo_file:
+    try:
+        logo = Image.open(logo_file)
+        col_logo, col_title = st.columns([1, 5])
+        with col_logo: st.image(logo, width=100)
+        with col_title: st.title("📅 行銷部會議預約系統")
+    except:
+        st.title("📅 行銷部會議預約系統")
+else:
     st.title("📅 行銷部會議預約系統")
 
 # --- 📸 新增：部門合照 ---
-try:
-    team_photo = Image.open("team_photo.jpg") # 請確認檔名一致
-    # 使用 columns 來置中或調整大小，這裡設定佔滿寬度但限制高度比例
-    st.image(team_photo, use_container_width=True, caption="行銷部 Team Building")
-except:
-    pass # 如果沒照片就不顯示，不會報錯
+# 嘗試載入 team_photo，支援多種副檔名
+team_photo_file = None
+# 這裡列出可能的檔名，程式會自動找存在的那個
+possible_filenames = ["team_photo.jpg", "team_photo.png", "team_photo.jpeg", "Gemini_Generated_Image_1ammmg1ammmg1amm.jpg"]
+
+for filename in possible_filenames:
+    if os.path.exists(filename):
+        team_photo_file = filename
+        break
+
+if team_photo_file:
+    try:
+        team_photo = Image.open(team_photo_file) 
+        st.image(team_photo, use_container_width=True, caption="行銷部 Team Building")
+    except:
+        pass # 如果讀取失敗就不顯示，不報錯
 
 # --- 😂 每日一笑 ---
 st.info(f"💡 **每日一笑：** {get_daily_joke()}")
@@ -206,10 +230,20 @@ def check_overlap(df, check_date, start_t, end_t):
 def show_success_message():
     st.subheader("感謝您的預約")
     st.write("已通知主管進行審核。")
-    try:
-        img = Image.open("thank_you.jpg")
-        st.image(img, use_container_width=True)
-    except: pass
+    
+    # 嘗試載入 thank_you 圖片，支援多種副檔名
+    thank_you_file = None
+    for ext in ["jpg", "jpeg", "png"]:
+        if os.path.exists(f"thank_you.{ext}"):
+            thank_you_file = f"thank_you.{ext}"
+            break
+            
+    if thank_you_file:
+        try:
+            img = Image.open(thank_you_file)
+            st.image(img, use_container_width=True)
+        except: pass
+        
     if st.button("好的，我知道了", type="primary"): st.rerun()
 
 @st.dialog("📋 會議詳細資訊")
