@@ -297,23 +297,8 @@ st.markdown(f"<hr style='border-top: 2px solid {THEME_COLOR};'>", unsafe_allow_h
 # --- 行事曆 ---
 df = load_data()
 
-# 🔥 修正：使用更穩定的切換邏輯
-if "view_mode" not in st.session_state:
-    st.session_state["view_mode"] = "📱 列表"
-
-# 這個 callback 負責把按鈕的值存進 view_mode，然後強制重整
-def update_view():
-    st.session_state["view_mode"] = st.session_state["view_mode_selector"]
-
-# 顯示切換按鈕
-st.radio(
-    "檢視模式", 
-    ["📱 列表", "💻 週視圖"], 
-    horizontal=True, 
-    index=0 if st.session_state["view_mode"] == "📱 列表" else 1,
-    key="view_mode_selector",
-    on_change=update_view # 當使用者點擊時，觸發 update_view
-)
+# 🔥 固定為週視圖
+current_view = "timeGridWeek"
 
 events = []
 if "calendar_date" not in st.session_state:
@@ -338,9 +323,6 @@ if not df.empty and '日期' in df.columns:
                 "extendedProps": {"location": loc, "name": row['大名'], "attendees": row.get('與會人', ''), "content": row['預約內容'], "status": status, "pretty_time": f"{start_t[:5]} - {end_t[:5]}"}
             })
         except: continue
-
-# 🔥 關鍵：根據 session_state 決定行事曆類型，並且改變 key 強制重繪
-current_view = "listWeek" if st.session_state["view_mode"] == "📱 列表" else "timeGridWeek"
 
 calendar_options = {
     "initialView": current_view,
