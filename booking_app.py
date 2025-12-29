@@ -83,10 +83,9 @@ if logo_file:
 else:
     st.title("📅 行銷部會議預約系統")
 
-# --- 📸 新增：部門合照 ---
-# 嘗試載入 team_photo，支援多種副檔名
+# --- 📸 新增：部門合照 (附帶偵探功能) ---
 team_photo_file = None
-# 這裡列出可能的檔名，程式會自動找存在的那個
+# 這裡列出可能的檔名
 possible_filenames = ["team_photo.jpg", "team_photo.png", "team_photo.jpeg", "Gemini_Generated_Image_1ammmg1ammmg1amm.jpg"]
 
 for filename in possible_filenames:
@@ -98,8 +97,14 @@ if team_photo_file:
     try:
         team_photo = Image.open(team_photo_file) 
         st.image(team_photo, use_container_width=True, caption="行銷部 Team Building")
-    except:
-        pass # 如果讀取失敗就不顯示，不報錯
+    except Exception as e:
+        st.error(f"照片讀取錯誤: {e}")
+else:
+    # 找不到照片時，顯示提示訊息方便除錯
+    with st.expander("ℹ️ 還沒看到合照嗎？點這裡查看原因"):
+        st.warning("系統找不到照片，請確認您已將照片上傳到 GitHub，且檔名為 team_photo.jpg")
+        st.write("🔍 目前系統偵測到的檔案列表：")
+        st.code(os.listdir()) # 顯示所有檔案，方便核對檔名
 
 # --- 😂 每日一笑 ---
 st.info(f"💡 **每日一笑：** {get_daily_joke()}")
@@ -117,10 +122,8 @@ st.markdown(f"""
     }}
     .stButton>button:hover {{ transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }}
     
-    /* ⚠️ 關鍵修復：不要干擾 Radio Button (切換模式按鈕) 的樣式，讓它恢復預設行為 */
-    div[role="radiogroup"] {{
-        background-color: transparent !important;
-    }}
+    /* ⚠️ 關鍵修復：把針對 radio group 的背景設定拿掉，避免蓋住點擊區域 */
+    /* div[role="radiogroup"] {{ background-color: transparent !important; }} */
 
     div[data-testid="stExpander"] {{
         background-color: {CARD_COLOR}; border-radius: 10px;
