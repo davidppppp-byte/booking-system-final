@@ -21,10 +21,11 @@ LOCATION_OPTIONS = [
     "崇德門市", "生產中心", "物流中心", "線上", "外部"
 ]
 
-# --- 🎨 UI 設定：科技感配色 ---
-THEME_COLOR = "#2980B9"
-BG_COLOR = "#F8F9FA"
-CARD_COLOR = "#FFFFFF"
+# --- 🎨 UI 設定：韓系插畫風配色 (Creamy & Pastel) ---
+THEME_COLOR = "#D4A59A"  # 莫蘭迪粉 (主色)
+ACCENT_COLOR = "#8D6E63" # 暖拿鐵色 (深色文字/線條)
+BG_COLOR = "#FDFBF7"     # 奶油米白 (背景)
+CARD_COLOR = "#FFFFFF"   # 純白卡片
 
 TIME_OPTIONS = []
 for h in range(8, 18): 
@@ -33,32 +34,15 @@ for h in range(8, 18):
         TIME_OPTIONS.append(time(h, m))
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="行銷部會議預約", page_icon="📅", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="行銷部會議預約", page_icon="🧸", layout="wide", initial_sidebar_state="collapsed")
 
 # --- 😂 每日笑話資料庫 ---
 JOKES_DB = [
-    "為什麼數學書很難過？因為它有太多的問題。",
-    "什麼東西早上四條腿，中午兩條腿，晚上三條腿？人。",
-    "有一隻公鹿跑得很快，後來它變成了什麼？高速公鹿。",
-    "有一天小明出門前抹太多髮膠 然後他就...硬著頭皮出門",
-    "有一天小明跟朋友去樹下野餐，要走的時候發現衣服被勾住了，於是他就跟朋友說：樹勾衣餒",
-    "有一天大魚問小魚：你知道魚的記憶只有三秒嗎？小魚：真的假的!?大魚：什麼真的假的？",
-    "哈利波特裡面誰最有主見？佛地魔，因為他不會被牽著鼻子走",
-    "桃園三結義那天，張飛不滿意自己寫的字，轉頭對關羽說：「我字好醜。」於是關羽對張飛說：「呃，好醜你好，我字雲長。",
-    "哈哈哈哈哈哈哈哈刀哈哈哈哈哈哈哈哈，這是一個笑裡藏刀的笑話",
-    "為什麼小明放屁會這麼大聲？因為他穿喇叭褲",
-    "為什麼叫Judy的女生都比較愛玩?｜因為花天Judy",
-    "蟹老闆：「海綿寶寶，你被開除了！」海綿寶寶：「蟹老闆…」蟹老闆：「不用謝～」",
-    "有一對蜈蚣夫婦，他們走在路上，手牽著手手牽著手手牽著手手牽著手手牽著手手牽著手手牽著手手",
-    "小明家境平窮 從小到大過生日沒吃過蛋糕 有天他就跑去問爸爸 「爸爸，生日蛋糕是什麼味道」 爸爸跟小明說 等他生日那天他就知道了 小明生日到了 他很興奮 爸爸跟他說 小明 我問別人了 他們說蛋糕是奶油味的",
-    "皮卡丘走路？皮卡乒乓 (皮卡丘乒乓/走路聲)",
-    "蛤蜊的兄弟是誰？ 蛤蜊葛格 (蛤蜊哥哥)",
     "哥哥嚇弟弟，弟弟會變成甚麼?A : 地下道 (弟嚇到)",
     "料理鼠王的食譜都寫在哪裡?A : 鼠王筆記本 (死亡筆記本)",
     "哪個行業最不容易受傷A : 零售商 (零受傷)",
     "為什麼鱈魚是明朝皇帝A : 因為他以前是明太子",
     "待投稿，謝謝"
-    
 ]
 
 def get_daily_joke():
@@ -81,11 +65,11 @@ if logo_file:
         logo = Image.open(logo_file)
         col_logo, col_title = st.columns([1, 5])
         with col_logo: st.image(logo, width=100)
-        with col_title: st.title("📅 行銷部會議預約系統")
+        with col_title: st.title("🧸 行銷部會議預約")
     except:
-        st.title("📅 行銷部會議預約系統")
+        st.title("🧸 行銷部會議預約")
 else:
-    st.title("📅 行銷部會議預約系統")
+    st.title("🧸 行銷部會議預約")
 
 # --- 📸 部門合照 ---
 team_photo_file = None
@@ -98,32 +82,77 @@ for filename in possible_filenames:
 if team_photo_file:
     try:
         team_photo = Image.open(team_photo_file) 
-        st.image(team_photo, use_container_width=True, caption="行銷部 Team Building")
+        st.image(team_photo, use_container_width=True, caption="Marketing Team ✨")
     except: pass
 
-# --- 😂 每日一笑 ---
-st.info(f"💡 **每日一笑：** {get_daily_joke()}")
+# --- 😂 每日一笑 (韓系風格框) ---
+st.markdown(f"""
+    <div style="
+        background-color: #FFF3E0; 
+        padding: 15px; 
+        border-radius: 15px; 
+        border: 2px dashed {THEME_COLOR}; 
+        color: {ACCENT_COLOR};
+        margin-bottom: 20px;
+        text-align: center;
+        font-family: 'Comic Sans MS', sans-serif;">
+        ✨ <b>Daily Smile：</b> {get_daily_joke()} ✨
+    </div>
+""", unsafe_allow_html=True)
 
-# --- 🎨 CSS 優化 ---
+# --- 🎨 CSS 優化 (韓系 Ins 風) ---
 st.markdown(f"""
     <style>
-    .stApp {{ background-color: {BG_COLOR}; }}
+    /* 全站背景 - 奶油白 */
+    .stApp {{
+        background-color: {BG_COLOR};
+    }}
     
+    /* 標題文字 - 暖拿鐵色 */
+    h1, h2, h3, p, label, div {{
+        color: {ACCENT_COLOR} !important;
+        font-family: 'Helvetica Neue', sans-serif;
+    }}
+
+    /* 按鈕樣式 - 圓潤可愛 */
     .stButton>button {{
-        background: linear-gradient(135deg, {THEME_COLOR} 0%, #1A5276 100%);
-        color: white; border: None; border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.3s ease;
+        background-color: {THEME_COLOR};
+        color: white !important;
+        border: none;
+        border-radius: 20px; /* 超圓角 */
+        padding: 10px 24px;
+        box-shadow: 2px 2px 0px #BCAaa4; /* 可愛硬陰影 */
+        transition: all 0.2s;
     }}
-    .stButton>button:hover {{ transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }}
+    .stButton>button:hover {{
+        transform: translateY(2px);
+        box-shadow: 0px 0px 0px #BCAaa4;
+        background-color: #E6B0AA;
+    }}
     
+    /* 卡片區塊 - 懸浮圓角 */
     div[data-testid="stExpander"] {{
-        background-color: {CARD_COLOR}; border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #E0E0E0;
+        background-color: {CARD_COLOR};
+        border-radius: 15px;
+        border: 1px solid #F2E7E6;
+        box-shadow: 0 4px 15px rgba(212, 165, 154, 0.15);
     }}
-    a {{ color: {THEME_COLOR}; }}
-    h1, h2, h3 {{ font-family: 'Helvetica Neue', sans-serif; font-weight: 600; color: #2C3E50; }}
     
-    img {{ border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+    /* 輸入框樣式 */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div {{
+        border-radius: 10px;
+        background-color: #FFFDF9;
+        border: 1px solid #E0E0E0;
+    }}
+
+    /* 連結顏色 */
+    a {{ color: {THEME_COLOR}; text-decoration: none; border-bottom: 1px dotted {THEME_COLOR}; }}
+    
+    /* 圖片樣式 */
+    img {{
+        border-radius: 15px;
+        box-shadow: 5px 5px 0px #F2E7E6; /* 相框效果 */
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -146,27 +175,33 @@ def fix_time(t_str):
     try: return datetime.strptime(t_str, "%H:%M:%S").strftime("%H:%M:%S")
     except: return None
 
-# --- 寄信函數 ---
+# --- 寄信函數 (🔥 新增與會人欄位) ---
 def send_notification_email(booking_data):
     if "email" not in st.secrets: return
     sender_email = st.secrets["email"]["sender"]
     sender_password = st.secrets["email"]["password"]
     receiver_email = st.secrets["email"]["receiver"]
     subject = f"【會議預約通知】{booking_data['大名']} 申請了會議"
+    
+    # 這裡修改了 HTML 內容，加入與會人
     body = f"""
-    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-        <h3 style="color: {THEME_COLOR};">收到新的會議室預約申請</h3>
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #5D4037; background-color: #FDFBF7;">
+        <h3 style="color: {THEME_COLOR};">💌 收到新的會議室預約申請</h3>
         <p>請管理員登入系統進行審核。</p>
-        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; border-left: 4px solid {THEME_COLOR};">
+        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 15px; border: 2px dashed {THEME_COLOR};">
             <ul style="list-style-type: none; padding: 0;">
-                <li style="margin-bottom: 8px;"><b>👤 預約人：</b> {booking_data['大名']}</li>
-                <li style="margin-bottom: 8px;"><b>📅 日期：</b> {booking_data['日期']}</li>
-                <li style="margin-bottom: 8px;"><b>⏰ 時間：</b> {booking_data['開始時間']} ~ {booking_data['結束時間']}</li>
-                <li style="margin-bottom: 8px;"><b>📍 地點：</b> {booking_data['會議地點']}</li>
-                <li style="margin-bottom: 8px;"><b>📝 內容：</b> {booking_data['預約內容']}</li>
+                <li style="margin-bottom: 10px;"><b>👤 預約人：</b> {booking_data['大名']}</li>
+                <li style="margin-bottom: 10px;"><b>📅 日期：</b> {booking_data['日期']}</li>
+                <li style="margin-bottom: 10px;"><b>⏰ 時間：</b> {booking_data['開始時間']} ~ {booking_data['結束時間']}</li>
+                <li style="margin-bottom: 10px;"><b>📍 地點：</b> {booking_data['會議地點']}</li>
+                <li style="margin-bottom: 10px;"><b>📝 內容：</b> {booking_data['預約內容']}</li>
+                <li style="margin-bottom: 10px; color: {THEME_COLOR};"><b>👥 與會人：</b> {booking_data['與會人']}</li>
             </ul>
         </div>
-        <br><a href="https://share.streamlit.io" style="background-color: {THEME_COLOR}; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">前往審核</a>
+        <br>
+        <center>
+            <a href="https://share.streamlit.io" style="background-color: {THEME_COLOR}; color: white; padding: 12px 25px; text-decoration: none; border-radius: 20px; font-weight: bold; box-shadow: 2px 2px 0px #BCAaa4;">前往審核</a>
+        </center>
     </div>
     """
     msg = MIMEMultipart()
@@ -218,7 +253,7 @@ def check_overlap(df, check_date, start_t, end_t):
 # --- 彈跳視窗 ---
 @st.dialog("🎉 申請成功！")
 def show_success_message():
-    st.subheader("感謝您的預約")
+    st.subheader("Thank You! 💖")
     st.write("已通知主管進行審核。")
     thank_you_file = None
     for ext in ["jpg", "jpeg", "png"]:
@@ -297,12 +332,10 @@ else:
                         save_data(pd.concat([df, pd.DataFrame([new_row])], ignore_index=True))
                         send_notification_email(new_row); show_success_message()
 
-st.markdown(f"<hr style='border-top: 2px solid {THEME_COLOR};'>", unsafe_allow_html=True)
+st.markdown(f"<hr style='border-top: 2px dashed {THEME_COLOR};'>", unsafe_allow_html=True)
 
 # --- 行事曆 ---
 df = load_data()
-
-# 🔥 固定為週視圖
 current_view = "timeGridWeek"
 
 events = []
@@ -336,7 +369,6 @@ calendar_options = {
     "initialDate": st.session_state["calendar_date"],
 }
 
-# 🔥 關鍵修正：callbacks 加入 "eventClick"，同時保留 "datesSet" (日期記憶)
 calendar_state = calendar(events=events, options=calendar_options, key=f"calendar_{current_view}", callbacks=["datesSet", "eventClick"])
 
 if calendar_state.get("datesSet"):
