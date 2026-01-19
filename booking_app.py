@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import random
 import os
+import time as time_module # 避免與 datetime.time 衝突
 
 # --- ⚠️ 你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
@@ -21,11 +22,27 @@ LOCATION_OPTIONS = [
     "崇德門市", "生產中心", "物流中心", "線上", "外部"
 ]
 
-# --- 🎨 UI 設定：韓系插畫風配色 (Creamy & Pastel) ---
-THEME_COLOR = "#D4A59A"  # 莫蘭迪粉 (主色)
-ACCENT_COLOR = "#8D6E63" # 暖拿鐵色 (深色文字/線條)
-BG_COLOR = "#FDFBF7"     # 奶油米白 (背景)
-CARD_COLOR = "#FFFFFF"   # 純白卡片
+LOCATION_SLOGANS = {
+    "小會議室": "💡 空間小，點子大！適合腦力激盪。",
+    "大會議室": "🎤 麥克風測試... 這裡是決策的殿堂！",
+    "洽談室Ａ": "🤝 談生意、聊合作，這裡氣場最合。",
+    "洽談室Ｂ": "☕ 來杯咖啡嗎？輕鬆聊聊的好地方。",
+    "行銷部辦公室": "🚀 創意發射基地！",
+    "崇德門市": "🏪 前線支援！聽聽顧客的聲音。",
+    "生產中心": "🛠️ 這裡產出的不只是產品，還有職人精神。",
+    "物流中心": "📦 使命必達！效率就是我們的名字。",
+    "線上": "🌐 距離不是問題，網路把我們連在一起。",
+    "外部": "🌍 世界那麼大，去外面看看吧！"
+}
+
+# --- 心情投票選項 ---
+MOOD_OPTIONS = ["😀 超棒", "😐 平靜", "😫 累累"]
+
+# --- 🎨 UI 設定：韓系插畫風配色 ---
+THEME_COLOR = "#D4A59A"
+ACCENT_COLOR = "#8D6E63"
+BG_COLOR = "#FDFBF7"
+CARD_COLOR = "#FFFFFF"
 
 TIME_OPTIONS = []
 for h in range(8, 18): 
@@ -38,11 +55,23 @@ st.set_page_config(page_title="行銷部會議預約", page_icon="🧸", layout=
 
 # --- 😂 每日笑話資料庫 ---
 JOKES_DB = [
-    "哥哥嚇弟弟，弟弟會變成甚麼?A : 地下道 (弟嚇到)",
-    "料理鼠王的食譜都寫在哪裡?A : 鼠王筆記本 (死亡筆記本)",
-    "哪個行業最不容易受傷A : 零售商 (零受傷)",
-    "為什麼鱈魚是明朝皇帝A : 因為他以前是明太子",
-    "待投稿，謝謝"
+    "為什麼數學書很難過？因為它有太多的問題。",
+    "什麼東西早上四條腿，中午兩條腿，晚上三條腿？人。",
+    "有一隻公鹿跑得很快，後來它變成了什麼？高速公鹿。",
+    "皮卡丘站起來變什麼？皮卡兵。",
+    "為什麼飛機撞不到星星？因為星星會閃。",
+    "香蕉跌倒了會變什麼？茄子 (瘀青了)。",
+    "什麼動物最愛貼在牆上？海豹 (海報)。",
+    "綠豆哪裡人？嘉義人 (綠豆加薏仁)。",
+    "小明去便利商店買飲料，為什麼店員不理他？因為他買的是「去冰」。",
+    "猴子最討厭什麼線？平行線 (因為沒有相交/香蕉)。",
+    "哪種花最沒力？茉莉花 (好一朵美麗/沒力 的茉莉花)。",
+    "什麼卡通人物最黑暗？哆啦A夢 (因為他手伸不見五指)。",
+    "只有哪一個英文字母會發光？ F (F光了 / 發光了)",
+    "哪一個英文字母最酷？ C (西裝褲 / C裝褲)",
+    "皮卡丘走路？皮卡乒乓 (皮卡丘乒乓/走路聲)",
+    "蛤蜊的兄弟是誰？ 蛤蜊葛格 (蛤蜊哥哥)",
+    "書和筆誰是壞人？書，因為害人之心 book 有 (不可有)"
 ]
 
 def get_daily_joke():
@@ -85,7 +114,72 @@ if team_photo_file:
         st.image(team_photo, use_container_width=True, caption="Marketing Team ✨")
     except: pass
 
-# --- 😂 每日一笑 (韓系風格框) ---
+# --- 連線函數 ---
+def get_gc():
+    try:
+        if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+            creds = st.secrets["connections"]["gsheets"]["service_account"]
+        else:
+            creds = st.secrets["service_account"]
+        return gspread.service_account_from_dict(creds)
+    except: return None
+
+def get_worksheet():
+    gc = get_gc()
+    if gc:
+        try:
+            sh = gc.open_by_url(SHEET_URL)
+            return sh.worksheet("Sheet1")
+        except: return None
+    return None
+
+# --- 🔥 心情投票相關函數 ---
+def get_mood_worksheet():
+    gc = get_gc()
+    if gc:
+        try:
+            sh = gc.open_by_url(SHEET_URL)
+            try:
+                # 嘗試讀取 Moods 分頁
+                ws = sh.worksheet("Moods")
+            except:
+                # 如果沒有，就自動建立一個
+                ws = sh.add_worksheet(title="Moods", rows=10, cols=2)
+                # 初始化標題
+                ws.update('A1:B1', [['Mood', 'Count']])
+                # 初始化選項
+                init_data = [[m, 0] for m in MOOD_OPTIONS]
+                ws.update('A2:B4', init_data)
+            return ws
+        except: return None
+    return None
+
+def load_mood_data():
+    ws = get_mood_worksheet()
+    if ws:
+        try:
+            data = ws.get_all_values()
+            # 轉換成 dict: {'😀 超棒': 5, '😐 平靜': 2...}
+            mood_dict = {row[0]: int(row[1]) for row in data[1:] if len(row) >= 2 and row[1].isdigit()}
+            # 確保所有選項都有 keys
+            for m in MOOD_OPTIONS:
+                if m not in mood_dict: mood_dict[m] = 0
+            return mood_dict
+        except: pass
+    return {m: 0 for m in MOOD_OPTIONS}
+
+def update_mood_count(mood_to_add):
+    ws = get_mood_worksheet()
+    if ws:
+        try:
+            # 找到對應的儲存格並 +1
+            cell = ws.find(mood_to_add)
+            if cell:
+                current_val = int(ws.cell(cell.row, cell.col + 1).value)
+                ws.update_cell(cell.row, cell.col + 1, current_val + 1)
+        except: pass
+
+# --- 😂 每日一笑 ---
 st.markdown(f"""
     <div style="
         background-color: #FFF3E0; 
@@ -100,13 +194,53 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
+# --- 🌡️ 心情投票區塊 (韓系風格) ---
+st.markdown(f"<h3 style='text-align: center; color: {ACCENT_COLOR};'>🌡️ 今天心情如何？</h3>", unsafe_allow_html=True)
+
+# 載入目前票數
+mood_counts = load_mood_data()
+total_votes = sum(mood_counts.values()) if mood_counts else 0
+
+# 如果使用者還沒投過票 (Session State)，顯示按鈕
+if "has_voted" not in st.session_state:
+    st.session_state["has_voted"] = False
+
+if not st.session_state["has_voted"]:
+    c1, c2, c3 = st.columns(3)
+    # 按鈕邏輯
+    if c1.button("😀 超棒", use_container_width=True):
+        update_mood_count("😀 超棒")
+        st.session_state["has_voted"] = True
+        st.rerun()
+    if c2.button("😐 平靜", use_container_width=True):
+        update_mood_count("😐 平靜")
+        st.session_state["has_voted"] = True
+        st.rerun()
+    if c3.button("😫 累累", use_container_width=True):
+        update_mood_count("😫 累累")
+        st.session_state["has_voted"] = True
+        st.rerun()
+else:
+    # 投完票顯示結果
+    st.info("✨ 收到你的心情了！來看看大家的狀態：")
+    for mood in MOOD_OPTIONS:
+        count = mood_counts.get(mood, 0)
+        # 計算百分比
+        percent = (count / total_votes) if total_votes > 0 else 0
+        st.write(f"**{mood}** ({count} 票)")
+        st.progress(percent, text=f"{int(percent*100)}%")
+    
+    if st.button("🔄 再投一次 (測試用)", type="secondary"):
+        st.session_state["has_voted"] = False
+        st.rerun()
+
+st.markdown("---")
+
 # --- 🎨 CSS 優化 (韓系 Ins 風) ---
 st.markdown(f"""
     <style>
     /* 全站背景 - 奶油白 */
-    .stApp {{
-        background-color: {BG_COLOR};
-    }}
+    .stApp {{ background-color: {BG_COLOR}; }}
     
     /* 標題文字 - 暖拿鐵色 */
     h1, h2, h3, p, label, div {{
@@ -119,9 +253,9 @@ st.markdown(f"""
         background-color: {THEME_COLOR};
         color: white !important;
         border: none;
-        border-radius: 20px; /* 超圓角 */
+        border-radius: 20px;
         padding: 10px 24px;
-        box-shadow: 2px 2px 0px #BCAaa4; /* 可愛硬陰影 */
+        box-shadow: 2px 2px 0px #BCAaa4;
         transition: all 0.2s;
     }}
     .stButton>button:hover {{
@@ -130,7 +264,7 @@ st.markdown(f"""
         background-color: #E6B0AA;
     }}
     
-    /* 卡片區塊 - 懸浮圓角 */
+    /* 卡片區塊 */
     div[data-testid="stExpander"] {{
         background-color: {CARD_COLOR};
         border-radius: 15px;
@@ -138,35 +272,18 @@ st.markdown(f"""
         box-shadow: 0 4px 15px rgba(212, 165, 154, 0.15);
     }}
     
-    /* 輸入框樣式 */
+    /* 輸入框 */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {{
         border-radius: 10px;
         background-color: #FFFDF9;
         border: 1px solid #E0E0E0;
     }}
 
-    /* 連結顏色 */
     a {{ color: {THEME_COLOR}; text-decoration: none; border-bottom: 1px dotted {THEME_COLOR}; }}
     
-    /* 圖片樣式 */
-    img {{
-        border-radius: 15px;
-        box-shadow: 5px 5px 0px #F2E7E6; /* 相框效果 */
-    }}
+    img {{ border-radius: 15px; box-shadow: 5px 5px 0px #F2E7E6; }}
     </style>
 """, unsafe_allow_html=True)
-
-# --- 連線函數 ---
-def get_worksheet():
-    try:
-        if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-            creds = st.secrets["connections"]["gsheets"]["service_account"]
-        else:
-            creds = st.secrets["service_account"]
-        gc = gspread.service_account_from_dict(creds)
-        sh = gc.open_by_url(SHEET_URL)
-        return sh.worksheet("Sheet1")
-    except Exception: return None
 
 def fix_time(t_str):
     if not t_str: return None
@@ -175,7 +292,7 @@ def fix_time(t_str):
     try: return datetime.strptime(t_str, "%H:%M:%S").strftime("%H:%M:%S")
     except: return None
 
-# --- 寄信函數 (🔥 新增與會人欄位) ---
+# --- 寄信函數 ---
 def send_notification_email(booking_data):
     if "email" not in st.secrets: return
     sender_email = st.secrets["email"]["sender"]
@@ -183,7 +300,6 @@ def send_notification_email(booking_data):
     receiver_email = st.secrets["email"]["receiver"]
     subject = f"【會議預約通知】{booking_data['大名']} 申請了會議"
     
-    # 這裡修改了 HTML 內容，加入與會人
     body = f"""
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #5D4037; background-color: #FDFBF7;">
         <h3 style="color: {THEME_COLOR};">💌 收到新的會議室預約申請</h3>
@@ -265,6 +381,7 @@ def show_success_message():
             img = Image.open(thank_you_file)
             st.image(img, use_container_width=True)
         except: pass
+    st.balloons()
     if st.button("好的，我知道了", type="primary"): st.rerun()
 
 @st.dialog("📋 會議詳細資訊")
@@ -316,6 +433,10 @@ else:
             c3, c4 = st.columns(2)
             date_val = c3.date_input("日期", min_value=datetime.today())
             loc = c4.selectbox("地點", LOCATION_OPTIONS)
+            
+            if loc in LOCATION_SLOGANS:
+                st.caption(f"_{LOCATION_SLOGANS[loc]}_")
+            
             c5, c6 = st.columns(2)
             s_time = c5.selectbox("開始", TIME_OPTIONS, index=0)
             e_time = c6.selectbox("結束", TIME_OPTIONS, index=2)
