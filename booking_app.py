@@ -55,12 +55,10 @@ st.set_page_config(page_title="行銷部會議預約", page_icon="🧸", layout=
 
 # --- 😂 每日笑話資料庫 ---
 JOKES_DB = [
-    "為什麼數學書很難過？因為它有太多的問題。",
-    "蛤蜊義大利麵放太久會變成什麼？擺久蛤蜊義大利麵",
     "積德行善的相反是什麼？柯南行兇 (基德行善)",
-     "木魚掉到水裡變什麼?濕木魚 (虱目魚)",
-    "為什麼科學園區裡面常常跌倒？因為那裡很多絆倒體(半導體)",
-    "待投稿，謝謝"
+    "木魚掉到水裡變什麼?濕木魚 (虱目魚)",
+     "為什麼科學園區裡面常常跌倒？因為那裡很多絆倒體(半導體)",
+  
 ]
 
 def get_daily_joke():
@@ -134,9 +132,7 @@ def get_mood_worksheet():
             except:
                 # 如果沒有，就自動建立一個
                 ws = sh.add_worksheet(title="Moods", rows=10, cols=2)
-                # 初始化標題
                 ws.update('A1:B1', [['Mood', 'Count']])
-                # 初始化選項
                 init_data = [[m, 0] for m in MOOD_OPTIONS]
                 ws.update('A2:B4', init_data)
             return ws
@@ -148,9 +144,7 @@ def load_mood_data():
     if ws:
         try:
             data = ws.get_all_values()
-            # 轉換成 dict: {'😀 超棒': 5, '😐 平靜': 2...}
             mood_dict = {row[0]: int(row[1]) for row in data[1:] if len(row) >= 2 and row[1].isdigit()}
-            # 確保所有選項都有 keys
             for m in MOOD_OPTIONS:
                 if m not in mood_dict: mood_dict[m] = 0
             return mood_dict
@@ -161,7 +155,6 @@ def update_mood_count(mood_to_add):
     ws = get_mood_worksheet()
     if ws:
         try:
-            # 找到對應的儲存格並 +1
             cell = ws.find(mood_to_add)
             if cell:
                 current_val = int(ws.cell(cell.row, cell.col + 1).value)
@@ -183,20 +176,16 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- 🌡️ 心情投票區塊 (韓系風格) ---
+# --- 🌡️ 心情投票區塊 ---
 st.markdown(f"<h3 style='text-align: center; color: {ACCENT_COLOR};'>🌡️ 今天心情如何？</h3>", unsafe_allow_html=True)
-
-# 載入目前票數
 mood_counts = load_mood_data()
 total_votes = sum(mood_counts.values()) if mood_counts else 0
 
-# 如果使用者還沒投過票 (Session State)，顯示按鈕
 if "has_voted" not in st.session_state:
     st.session_state["has_voted"] = False
 
 if not st.session_state["has_voted"]:
     c1, c2, c3 = st.columns(3)
-    # 按鈕邏輯
     if c1.button("😀 超棒", use_container_width=True):
         update_mood_count("😀 超棒")
         st.session_state["has_voted"] = True
@@ -210,15 +199,12 @@ if not st.session_state["has_voted"]:
         st.session_state["has_voted"] = True
         st.rerun()
 else:
-    # 投完票顯示結果
     st.info("✨ 收到你的心情了！來看看大家的狀態：")
     for mood in MOOD_OPTIONS:
         count = mood_counts.get(mood, 0)
-        # 計算百分比
         percent = (count / total_votes) if total_votes > 0 else 0
         st.write(f"**{mood}** ({count} 票)")
         st.progress(percent, text=f"{int(percent*100)}%")
-    
     if st.button("🔄 再投一次 (測試用)", type="secondary"):
         st.session_state["has_voted"] = False
         st.rerun()
@@ -228,16 +214,11 @@ st.markdown("---")
 # --- 🎨 CSS 優化 (韓系 Ins 風) ---
 st.markdown(f"""
     <style>
-    /* 全站背景 - 奶油白 */
     .stApp {{ background-color: {BG_COLOR}; }}
-    
-    /* 標題文字 - 暖拿鐵色 */
     h1, h2, h3, p, label, div {{
         color: {ACCENT_COLOR} !important;
         font-family: 'Helvetica Neue', sans-serif;
     }}
-
-    /* 按鈕樣式 - 圓潤可愛 */
     .stButton>button {{
         background-color: {THEME_COLOR};
         color: white !important;
@@ -252,24 +233,18 @@ st.markdown(f"""
         box-shadow: 0px 0px 0px #BCAaa4;
         background-color: #E6B0AA;
     }}
-    
-    /* 卡片區塊 */
     div[data-testid="stExpander"] {{
         background-color: {CARD_COLOR};
         border-radius: 15px;
         border: 1px solid #F2E7E6;
         box-shadow: 0 4px 15px rgba(212, 165, 154, 0.15);
     }}
-    
-    /* 輸入框 */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {{
         border-radius: 10px;
         background-color: #FFFDF9;
         border: 1px solid #E0E0E0;
     }}
-
     a {{ color: {THEME_COLOR}; text-decoration: none; border-bottom: 1px dotted {THEME_COLOR}; }}
-    
     img {{ border-radius: 15px; box-shadow: 5px 5px 0px #F2E7E6; }}
     </style>
 """, unsafe_allow_html=True)
@@ -281,7 +256,7 @@ def fix_time(t_str):
     try: return datetime.strptime(t_str, "%H:%M:%S").strftime("%H:%M:%S")
     except: return None
 
-# --- 寄信函數 ---
+# --- 寄信函數：新預約 ---
 def send_notification_email(booking_data):
     if "email" not in st.secrets: return
     sender_email = st.secrets["email"]["sender"]
@@ -318,6 +293,40 @@ def send_notification_email(booking_data):
         server.sendmail(sender_email, receiver_email, msg.as_string())
         server.quit()
         st.toast("📧 通知信已發送！", icon="✅")
+    except: pass
+
+# --- 🔥 新增：寄信函數：取消預約 ---
+def send_deletion_email(booking_data):
+    if "email" not in st.secrets: return
+    sender_email = st.secrets["email"]["sender"]
+    sender_password = st.secrets["email"]["password"]
+    receiver_email = st.secrets["email"]["receiver"]
+    subject = f"【會議取消通知】{booking_data['大名']} 取消了會議"
+    
+    body = f"""
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #5D4037; background-color: #FDFBF7;">
+        <h3 style="color: #E57373;">🗑️ 會議已取消</h3>
+        <p>同仁已在前台自行取消以下預約，請知悉。</p>
+        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 15px; border: 2px dashed #E57373;">
+            <ul style="list-style-type: none; padding: 0;">
+                <li style="margin-bottom: 10px;"><b>👤 取消人：</b> {booking_data['大名']}</li>
+                <li style="margin-bottom: 10px;"><b>📅 原定日期：</b> {booking_data['日期']}</li>
+                <li style="margin-bottom: 10px;"><b>⏰ 原定時間：</b> {booking_data['開始時間']} ~ {booking_data['結束時間']}</li>
+                <li style="margin-bottom: 10px;"><b>📍 地點：</b> {booking_data['會議地點']}</li>
+                <li style="margin-bottom: 10px;"><b>📝 內容：</b> {booking_data['預約內容']}</li>
+            </ul>
+        </div>
+    </div>
+    """
+    msg = MIMEMultipart()
+    msg['From'] = sender_email; msg['To'] = receiver_email; msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls(); server.login(sender_email, sender_password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        server.quit()
+        st.toast("📧 取消通知已發送！", icon="✅")
     except: pass
 
 @st.cache_data(ttl=5)
@@ -373,6 +382,7 @@ def show_success_message():
     st.balloons()
     if st.button("好的，我知道了", type="primary"): st.rerun()
 
+# --- 🔥 修改：詳情視窗 (增加刪除按鈕) ---
 @st.dialog("📋 會議詳細資訊")
 def show_event_details(event_props):
     st.markdown(f"### **{event_props.get('content', '無內容')}**")
@@ -391,6 +401,38 @@ def show_event_details(event_props):
     if event_props.get('status'):
         st.caption("📌 狀態")
         st.write(event_props.get('status'))
+    
+    st.write("---")
+    st.caption("⚠️ 操作區")
+    # 刪除按鈕
+    if st.button("🗑️ 我要取消這個預約", type="primary", use_container_width=True, help="請確認這是您的預約再刪除"):
+        # 載入當前資料
+        current_df = load_data()
+        if not current_df.empty:
+            # 尋找匹配的資料列 (使用 原始日期、時間、地點 進行比對)
+            mask = (
+                (current_df['日期'] == event_props.get('raw_date')) & 
+                (current_df['開始時間'] == event_props.get('raw_start')) & 
+                (current_df['結束時間'] == event_props.get('raw_end')) & 
+                (current_df['會議地點'] == event_props.get('location'))
+            )
+            
+            if not current_df[mask].empty:
+                # 抓出要刪除的那一行 (為了寄信)
+                row_to_delete = current_df[mask].iloc[0]
+                
+                # 刪除資料 (保留不符合 mask 的資料)
+                new_df = current_df[~mask]
+                save_data(new_df)
+                
+                # 寄出取消通知信
+                with st.spinner("正在取消並發送通知..."):
+                    send_deletion_email(row_to_delete)
+                
+                st.success("預約已取消！")
+                st.rerun()
+            else:
+                st.error("❌ 找不到此預約，可能已經被刪除了。")
 
 # --- 主程式 ---
 st.sidebar.header("🔒 管理員專區")
@@ -405,14 +447,23 @@ if is_admin:
     st.markdown(f"<h3 style='color:{THEME_COLOR}'>📋 審核後台</h3>", unsafe_allow_html=True)
     load_data.clear(); df = load_data()
     if not df.empty:
-        edited_df = st.data_editor(df, column_config={
-            "狀態": st.column_config.SelectboxColumn("狀態", options=["待審核", "核准", "拒絕"], required=True),
-            "會議地點": st.column_config.TextColumn(disabled=True),
-            "與會人": st.column_config.TextColumn("與會人"),
-            "刪除": st.column_config.CheckboxColumn(required=True)
-        }, num_rows="dynamic", key="admin", use_container_width=True)
+        df["刪除"] = False
+        edited_df = st.data_editor(
+            df, 
+            column_config={
+                "狀態": st.column_config.SelectboxColumn("狀態", options=["待審核", "核准", "拒絕"], required=True),
+                "會議地點": st.column_config.TextColumn(disabled=True),
+                "與會人": st.column_config.TextColumn("與會人"),
+                "刪除": st.column_config.CheckboxColumn(label="🗑️ 刪除", help="勾選並儲存以刪除資料")
+            },
+            num_rows="dynamic", key="admin", use_container_width=True
+        )
         if st.button("💾 儲存變更", type="primary", use_container_width=True):
-            save_data(edited_df); st.success("已更新"); st.rerun()
+            final_df = edited_df[edited_df["刪除"] == False]
+            final_df = final_df.drop(columns=["刪除"])
+            save_data(final_df)
+            st.success("已更新")
+            st.rerun()
 else:
     with st.expander("➕ 申請預約 (需審核)", expanded=True):
         with st.form("booking_form"):
@@ -465,10 +516,22 @@ if not df.empty and '日期' in df.columns:
             elif status == '拒絕': bg_color = "#7F8C8D"
             title_text = f"[{loc}] {row['大名']}"
             if is_admin: title_text = f"({status}) {title_text}"
+            
+            # 🔥 關鍵：把原始資料藏在 extendedProps 裡，供刪除時比對
             events.append({
                 "title": title_text, "start": f"{clean_date}T{start_t}", "end": f"{clean_date}T{end_t}",
                 "backgroundColor": bg_color, "borderColor": bg_color, "textColor": "#FFFFFF",
-                "extendedProps": {"location": loc, "name": row['大名'], "attendees": row.get('與會人', ''), "content": row['預約內容'], "status": status, "pretty_time": f"{start_t[:5]} - {end_t[:5]}"}
+                "extendedProps": {
+                    "location": loc, 
+                    "name": row['大名'], 
+                    "attendees": row.get('與會人', ''), 
+                    "content": row['預約內容'], 
+                    "status": status, 
+                    "pretty_time": f"{start_t[:5]} - {end_t[:5]}",
+                    "raw_date": row['日期'],      # 原始日期 (給刪除用)
+                    "raw_start": row['開始時間'], # 原始開始時間 (給刪除用)
+                    "raw_end": row['結束時間']    # 原始結束時間 (給刪除用)
+                }
             })
         except: continue
 
