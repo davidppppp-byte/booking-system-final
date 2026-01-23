@@ -53,30 +53,15 @@ for h in range(8, 18):
 # --- 頁面設定 ---
 st.set_page_config(page_title="行銷部會議預約", page_icon="🧸", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 😂 每日笑話資料庫 ---
+# --- 😂 每日笑話資料庫 (內建) ---
 JOKES_DB = [
-
-
-
-
-
-
-
-
-    
     "積德行善的相反是什麼？柯南行兇 (基德行善)",
     "木魚掉到水裡變什麼?濕木魚 (虱目魚)",
     "為什麼科學園區裡面常常跌倒？因為那裡很多絆倒體(半導體)",
     "白氣球揍了黑氣球一拳，黑氣球很痛很生氣於是決定告白氣球。｜這我覺得還好ＸＤ",
     "翁山蘇姬的哥哥叫什麼？蘇姬大哥",
-    "沒了，待投稿",
-  
+    "為什麼南部沒有廟宇？因為南無阿彌陀佛",
 ]
-
-def get_daily_joke():
-    day_of_year = datetime.now().timetuple().tm_yday
-    joke_index = day_of_year % len(JOKES_DB)
-    return JOKES_DB[joke_index]
 
 # --- 樣式與 Logo ---
 logo_file = None
@@ -132,17 +117,59 @@ def get_worksheet():
         except: return None
     return None
 
-# --- 🔥 心情投票相關函數 ---
+# --- 🔥 笑話管理函數 ---
+def get_jokes_worksheet():
+    gc = get_gc()
+    if gc:
+        try:
+            sh = gc.open_by_url(SHEET_URL)
+            try:
+                ws = sh.worksheet("Jokes")
+            except:
+                ws = sh.add_worksheet(title="Jokes", rows=100, cols=1)
+                ws.update('A1', [['Joke Content']])
+            return ws
+        except: return None
+    return None
+
+def get_all_jokes():
+    # 讀取內建笑話
+    all_jokes = JOKES_DB.copy()
+    # 嘗試讀取自訂笑話
+    try:
+        ws = get_jokes_worksheet()
+        if ws:
+            custom_jokes = ws.col_values(1)
+            if len(custom_jokes) > 1: # 排除標題
+                all_jokes.extend(custom_jokes[1:])
+    except: pass
+    return all_jokes
+
+def add_new_joke(joke_text):
+    ws = get_jokes_worksheet()
+    if ws:
+        try:
+            ws.append_row([joke_text])
+            return True
+        except: return False
+    return False
+
+def get_daily_joke():
+    full_db = get_all_jokes()
+    if not full_db: return "今天沒有笑話..."
+    day_of_year = datetime.now().timetuple().tm_yday
+    joke_index = day_of_year % len(full_db)
+    return full_db[joke_index]
+
+# --- 🔥 心情投票函數 ---
 def get_mood_worksheet():
     gc = get_gc()
     if gc:
         try:
             sh = gc.open_by_url(SHEET_URL)
             try:
-                # 嘗試讀取 Moods 分頁
                 ws = sh.worksheet("Moods")
             except:
-                # 如果沒有，就自動建立一個
                 ws = sh.add_worksheet(title="Moods", rows=10, cols=2)
                 ws.update('A1:B1', [['Mood', 'Count']])
                 init_data = [[m, 0] for m in MOOD_OPTIONS]
@@ -268,7 +295,7 @@ def fix_time(t_str):
     try: return datetime.strptime(t_str, "%H:%M:%S").strftime("%H:%M:%S")
     except: return None
 
-# --- 寄信函數：新預約 ---
+# --- 寄信函數 ---
 def send_notification_email(booking_data):
     if "email" not in st.secrets: return
     sender_email = st.secrets["email"]["sender"]
@@ -307,7 +334,6 @@ def send_notification_email(booking_data):
         st.toast("📧 通知信已發送！", icon="✅")
     except: pass
 
-# --- 🔥 新增：寄信函數：取消預約 ---
 def send_deletion_email(booking_data):
     if "email" not in st.secrets: return
     sender_email = st.secrets["email"]["sender"]
@@ -394,7 +420,6 @@ def show_success_message():
     st.balloons()
     if st.button("好的，我知道了", type="primary"): st.rerun()
 
-# --- 🔥 修改：詳情視窗 (增加刪除按鈕) ---
 @st.dialog("📋 會議詳細資訊")
 def show_event_details(event_props):
     st.markdown(f"### **{event_props.get('content', '無內容')}**")
@@ -416,12 +441,9 @@ def show_event_details(event_props):
     
     st.write("---")
     st.caption("⚠️ 操作區")
-    # 刪除按鈕
     if st.button("🗑️ 我要取消這個預約", type="primary", use_container_width=True, help="請確認這是您的預約再刪除"):
-        # 載入當前資料
         current_df = load_data()
         if not current_df.empty:
-            # 尋找匹配的資料列 (使用 原始日期、時間、地點 進行比對)
             mask = (
                 (current_df['日期'] == event_props.get('raw_date')) & 
                 (current_df['開始時間'] == event_props.get('raw_start')) & 
@@ -430,17 +452,11 @@ def show_event_details(event_props):
             )
             
             if not current_df[mask].empty:
-                # 抓出要刪除的那一行 (為了寄信)
                 row_to_delete = current_df[mask].iloc[0]
-                
-                # 刪除資料 (保留不符合 mask 的資料)
                 new_df = current_df[~mask]
                 save_data(new_df)
-                
-                # 寄出取消通知信
                 with st.spinner("正在取消並發送通知..."):
                     send_deletion_email(row_to_delete)
-                
                 st.success("預約已取消！")
                 st.rerun()
             else:
@@ -456,7 +472,23 @@ is_admin = admin_pwd == ADMIN_PASSWORD
 if is_admin:
     st.sidebar.success("✅ 管理員已登入")
     if st.sidebar.button("🚪 登出 / 回首頁"): logout(); st.rerun()
+    
     st.markdown(f"<h3 style='color:{THEME_COLOR}'>📋 審核後台</h3>", unsafe_allow_html=True)
+    
+    # 🔥 管理員新增笑話區塊
+    with st.expander("🤡 新增每日笑話", expanded=False):
+        new_joke = st.text_input("輸入笑話內容", placeholder="範例：為什麼電腦會冷？因為它有 Windows")
+        if st.button("➕ 新增笑話"):
+            if new_joke:
+                if add_new_joke(new_joke):
+                    st.success("笑話已新增！明天可能會出現喔！")
+                else:
+                    st.error("新增失敗，請檢查連線")
+            else:
+                st.warning("請輸入內容")
+    
+    st.write("---")
+    
     load_data.clear(); df = load_data()
     if not df.empty:
         df["刪除"] = False
@@ -529,7 +561,6 @@ if not df.empty and '日期' in df.columns:
             title_text = f"[{loc}] {row['大名']}"
             if is_admin: title_text = f"({status}) {title_text}"
             
-            # 🔥 關鍵：把原始資料藏在 extendedProps 裡，供刪除時比對
             events.append({
                 "title": title_text, "start": f"{clean_date}T{start_t}", "end": f"{clean_date}T{end_t}",
                 "backgroundColor": bg_color, "borderColor": bg_color, "textColor": "#FFFFFF",
@@ -540,9 +571,9 @@ if not df.empty and '日期' in df.columns:
                     "content": row['預約內容'], 
                     "status": status, 
                     "pretty_time": f"{start_t[:5]} - {end_t[:5]}",
-                    "raw_date": row['日期'],      # 原始日期 (給刪除用)
-                    "raw_start": row['開始時間'], # 原始開始時間 (給刪除用)
-                    "raw_end": row['結束時間']    # 原始結束時間 (給刪除用)
+                    "raw_date": row['日期'],
+                    "raw_start": row['開始時間'],
+                    "raw_end": row['結束時間']
                 }
             })
         except: continue
