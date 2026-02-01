@@ -38,11 +38,11 @@ LOCATION_SLOGANS = {
 # --- 心情投票選項 ---
 MOOD_OPTIONS = ["😀 超棒", "😐 平靜", "😫 累累"]
 
-# --- 🎨 UI 設定：韓系插畫風配色 ---
-THEME_COLOR = "#D4A59A"
-ACCENT_COLOR = "#8D6E63"
-BG_COLOR = "#FDFBF7"
-CARD_COLOR = "#FFFFFF"
+# --- 🎨 UI 設定：清新抹茶拿鐵風 (Matcha Latte) ---
+THEME_COLOR = "#66BB6A"  # 抹茶綠 (主色)
+ACCENT_COLOR = "#2E7D32" # 深焙茶綠 (深色文字)
+BG_COLOR = "#F1F8E9"     # 牛奶白綠 (背景)
+CARD_COLOR = "#FFFFFF"   # 純白卡片
 
 TIME_OPTIONS = []
 for h in range(8, 18): 
@@ -51,16 +51,16 @@ for h in range(8, 18):
         TIME_OPTIONS.append(time(h, m))
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="行銷部會議預約", page_icon="🧸", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="行銷部會議預約", page_icon="🌿", layout="wide", initial_sidebar_state="collapsed")
 
 # --- 😂 每日笑話資料庫 (更新版) ---
 JOKES_DB = [
-    "小明對芒果過敏，你知道小明不能吃什麼嗎？    鋼琴",
-    "T懷孕會變什麼.........ㄛ？",
-    "什麼動物每週二出現？.......美洲鱷",
-    "什麼人肚子最印？.........印度人",
-    "假日哪裡最多越南人？.......越南",
-    "端午節不會找什麼人划龍舟？........客家人，因為划不來"
+    "積德行善的相反是什麼？柯南行兇 (基德行善)",
+    "木魚掉到水裡變什麼?濕木魚 (虱目魚)",
+    "為什麼科學園區裡面常常跌倒？因為那裡很多絆倒體(半導體)",
+    "白氣球揍了黑氣球一拳，黑氣球很痛很生氣於是決定告白氣球。",
+    "翁山蘇姬的哥哥叫什麼？蘇姬大哥",
+    "為什麼南部沒有廟宇？因為南無阿彌陀佛"
 ]
 
 # --- 樣式與 Logo ---
@@ -78,11 +78,11 @@ if logo_file:
         logo = Image.open(logo_file)
         col_logo, col_title = st.columns([1, 5])
         with col_logo: st.image(logo, width=100)
-        with col_title: st.title("🧸 行銷部會議預約")
+        with col_title: st.title("🌿 行銷部會議預約")
     except:
-        st.title("🧸 行銷部會議預約")
+        st.title("🌿 行銷部會議預約")
 else:
-    st.title("🧸 行銷部會議預約")
+    st.title("🌿 行銷部會議預約")
 
 # --- 📸 部門合照 ---
 team_photo_file = None
@@ -171,7 +171,6 @@ def get_daily_joke():
     if not full_db: return "今天沒有笑話..."
     
     # 🔥 改良：使用「台灣時間」的「日期字串」作為隨機種子
-    # 這樣每一天對於所有人來說，選到的笑話都是固定的，而且是隨機挑選，不會受長度影響
     tw_now = datetime.utcnow() + timedelta(hours=8)
     seed_val = tw_now.strftime("%Y%m%d") # 例如: 20231027
     
@@ -218,18 +217,18 @@ def update_mood_count(mood_to_add):
                 ws.update_cell(cell.row, cell.col + 1, current_val + 1)
         except: pass
 
-# --- 😂 每日一笑 ---
+# --- 😂 每日一笑 (更新風格) ---
 st.markdown(f"""
     <div style="
-        background-color: #FFF3E0; 
+        background-color: #E8F5E9; 
         padding: 15px; 
         border-radius: 15px; 
-        border: 2px dashed {THEME_COLOR}; 
+        border: 2px solid {THEME_COLOR}; 
         color: {ACCENT_COLOR};
         margin-bottom: 20px;
         text-align: center;
-        font-family: 'Comic Sans MS', sans-serif;">
-        ✨ <b>Daily Smile：</b> {get_daily_joke()} ✨
+        font-family: 'Helvetica', sans-serif;">
+        🍵 <b>Daily Smile：</b> {get_daily_joke()} 🍵
     </div>
 """, unsafe_allow_html=True)
 
@@ -281,41 +280,51 @@ else:
 
 st.markdown("---")
 
-# --- 🎨 CSS 優化 (韓系 Ins 風) ---
+# --- 🎨 CSS 優化 (清新抹茶風) ---
 st.markdown(f"""
     <style>
+    /* 全站背景 - 牛奶白綠 */
     .stApp {{ background-color: {BG_COLOR}; }}
+    
+    /* 標題文字 - 深焙茶綠 */
     h1, h2, h3, p, label, div {{
         color: {ACCENT_COLOR} !important;
         font-family: 'Helvetica Neue', sans-serif;
     }}
+
+    /* 按鈕樣式 - 抹茶綠漸層 */
     .stButton>button {{
-        background-color: {THEME_COLOR};
+        background: linear-gradient(135deg, {THEME_COLOR} 0%, #43A047 100%);
         color: white !important;
         border: none;
-        border-radius: 20px;
+        border-radius: 12px; /* 稍微方一點點，比較現代 */
         padding: 10px 24px;
-        box-shadow: 2px 2px 0px #BCAaa4;
+        box-shadow: 0 4px 6px rgba(46, 125, 50, 0.2);
         transition: all 0.2s;
     }}
     .stButton>button:hover {{
-        transform: translateY(2px);
-        box-shadow: 0px 0px 0px #BCAaa4;
-        background-color: #E6B0AA;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 10px rgba(46, 125, 50, 0.3);
     }}
+    
+    /* 卡片區塊 */
     div[data-testid="stExpander"] {{
         background-color: {CARD_COLOR};
-        border-radius: 15px;
-        border: 1px solid #F2E7E6;
-        box-shadow: 0 4px 15px rgba(212, 165, 154, 0.15);
+        border-radius: 12px;
+        border: 1px solid #C8E6C9; /* 淡綠色邊框 */
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }}
+    
+    /* 輸入框 */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {{
-        border-radius: 10px;
-        background-color: #FFFDF9;
-        border: 1px solid #E0E0E0;
+        border-radius: 8px;
+        background-color: #FFFFFF;
+        border: 1px solid #A5D6A7; /* 綠色邊框 */
     }}
+
     a {{ color: {THEME_COLOR}; text-decoration: none; border-bottom: 1px dotted {THEME_COLOR}; }}
-    img {{ border-radius: 15px; box-shadow: 5px 5px 0px #F2E7E6; }}
+    
+    img {{ border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -335,10 +344,10 @@ def send_notification_email(booking_data):
     subject = f"【會議預約通知】{booking_data['大名']} 申請了會議"
     
     body = f"""
-    <div style="font-family: Arial, sans-serif; padding: 20px; color: #5D4037; background-color: #FDFBF7;">
-        <h3 style="color: {THEME_COLOR};">💌 收到新的會議室預約申請</h3>
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #2E7D32; background-color: #F1F8E9;">
+        <h3 style="color: {THEME_COLOR};">🍃 收到新的會議室預約申請</h3>
         <p>請管理員登入系統進行審核。</p>
-        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 15px; border: 2px dashed {THEME_COLOR};">
+        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border-left: 5px solid {THEME_COLOR}; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
             <ul style="list-style-type: none; padding: 0;">
                 <li style="margin-bottom: 10px;"><b>👤 預約人：</b> {booking_data['大名']}</li>
                 <li style="margin-bottom: 10px;"><b>📅 日期：</b> {booking_data['日期']}</li>
@@ -350,7 +359,7 @@ def send_notification_email(booking_data):
         </div>
         <br>
         <center>
-            <a href="https://share.streamlit.io" style="background-color: {THEME_COLOR}; color: white; padding: 12px 25px; text-decoration: none; border-radius: 20px; font-weight: bold; box-shadow: 2px 2px 0px #BCAaa4;">前往審核</a>
+            <a href="https://share.streamlit.io" style="background-color: {THEME_COLOR}; color: white; padding: 12px 25px; text-decoration: none; border-radius: 20px; font-weight: bold;">前往審核</a>
         </center>
     </div>
     """
@@ -373,10 +382,10 @@ def send_deletion_email(booking_data):
     subject = f"【會議取消通知】{booking_data['大名']} 取消了會議"
     
     body = f"""
-    <div style="font-family: Arial, sans-serif; padding: 20px; color: #5D4037; background-color: #FDFBF7;">
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #555; background-color: #FAFAFA;">
         <h3 style="color: #E57373;">🗑️ 會議已取消</h3>
         <p>同仁已在前台自行取消以下預約，請知悉。</p>
-        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 15px; border: 2px dashed #E57373;">
+        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border: 1px solid #E57373;">
             <ul style="list-style-type: none; padding: 0;">
                 <li style="margin-bottom: 10px;"><b>👤 取消人：</b> {booking_data['大名']}</li>
                 <li style="margin-bottom: 10px;"><b>📅 原定日期：</b> {booking_data['日期']}</li>
