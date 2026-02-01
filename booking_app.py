@@ -10,7 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import random
 import os
-import time as time_module # 避免與 datetime.time 衝突
+import time as time_module
 
 # --- ⚠️ 你的網址 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1mpVm9tTWO3gmFx32dKqtA5_xcLrbCmGN6wDMC1sSjHs/edit"
@@ -53,21 +53,6 @@ for h in range(8, 18):
 # --- 頁面設定 ---
 st.set_page_config(page_title="行銷部會議預約", page_icon="🧸", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 😂 每日笑話資料庫 (更新版) ---
-JOKES_DB = [
-
-    "木魚掉到水裡變什麼?濕木魚 (虱目魚)",
-    "為什麼科學園區裡面常常跌倒？因為那裡很多絆倒體(半導體)",
-    "白氣球揍了黑氣球一拳，黑氣球很痛很生氣於是決定告白氣球。",
-    "翁山蘇姬的哥哥叫什麼？蘇姬大哥",
-    "積德行善的相反是什麼？柯南行兇 (基德行善)"
-    "翁山蘇姬的哥哥叫什麼？蘇姬大哥",
-    "木魚掉到水裡變什麼?濕木魚 (虱目魚)",
-    "為什麼科學園區裡面常常跌倒？因為那裡很多絆倒體(半導體)",
-    "白氣球揍了黑氣球一拳，黑氣球很痛很生氣於是決定告白氣球。",
-    "為什麼南部沒有廟宇？因為南無阿彌陀佛",
-    
-]
 
 # --- 樣式與 Logo ---
 logo_file = None
@@ -123,7 +108,7 @@ def get_worksheet():
         except: return None
     return None
 
-# --- 🔥 笑話管理函數 ---
+# --- 🔥 笑話管理函數 (加入快取機制) ---
 def get_jokes_worksheet():
     gc = get_gc()
     if gc:
@@ -138,17 +123,27 @@ def get_jokes_worksheet():
         except: return None
     return None
 
-def get_all_jokes():
-    # 讀取內建笑話
-    all_jokes = JOKES_DB.copy()
-    # 嘗試讀取自訂笑話
+# 🔥 關鍵修改：加入 ttl=600 (10分鐘快取)，避免頻繁讀取導致額度超標
+@st.cache_data(ttl=600)
+def fetch_custom_jokes_from_sheet():
+    custom_jokes = []
     try:
         ws = get_jokes_worksheet()
         if ws:
-            custom_jokes = ws.col_values(1)
-            if len(custom_jokes) > 1: # 排除標題
-                all_jokes.extend(custom_jokes[1:])
+            # 讀取第一欄所有資料
+            vals = ws.col_values(1)
+            if len(vals) > 1: # 排除標題
+                custom_jokes = vals[1:]
     except: pass
+    return custom_jokes
+
+def get_all_jokes():
+    # 讀取內建笑話
+    all_jokes = JOKES_DB.copy()
+    # 讀取自訂笑話 (有快取保護)
+    custom_jokes = fetch_custom_jokes_from_sheet()
+    if custom_jokes:
+        all_jokes.extend(custom_jokes)
     return all_jokes
 
 def add_new_joke(joke_text):
@@ -156,6 +151,8 @@ def add_new_joke(joke_text):
     if ws:
         try:
             ws.append_row([joke_text])
+            # 🔥 投稿成功後，清除快取，這樣下次讀取才會看到新的
+            fetch_custom_jokes_from_sheet.clear()
             return True
         except: return False
     return False
@@ -163,9 +160,15 @@ def add_new_joke(joke_text):
 def get_daily_joke():
     full_db = get_all_jokes()
     if not full_db: return "今天沒有笑話..."
-    day_of_year = datetime.now().timetuple().tm_yday
-    joke_index = day_of_year % len(full_db)
-    return full_db[joke_index]
+    
+    # 🔥 改良：使用「台灣時間」的「日期字串」作為隨機種子
+    # 這樣每一天對於所有人來說，選到的笑話都是固定的，而且是隨機挑選，不會受長度影響
+    tw_now = datetime.utcnow() + timedelta(hours=8)
+    seed_val = tw_now.strftime("%Y%m%d") # 例如: 20231027
+    
+    # 使用獨立的隨機產生器，不影響全域 random
+    rng = random.Random(seed_val)
+    return rng.choice(full_db)
 
 # --- 🔥 心情投票函數 ---
 def get_mood_worksheet():
