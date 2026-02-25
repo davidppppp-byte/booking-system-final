@@ -38,10 +38,10 @@ LOCATION_SLOGANS = {
 # --- 心情投票選項 ---
 MOOD_OPTIONS = ["😀 超棒", "😐 平靜", "😫 累累"]
 
-# --- 🎨 UI 設定：清新抹茶拿鐵風 (Matcha Latte) ---
-THEME_COLOR = "#66BB6A"  # 抹茶綠 (主色)
-ACCENT_COLOR = "#2E7D32" # 深焙茶綠 (深色文字)
-BG_COLOR = "#F1F8E9"     # 牛奶白綠 (背景)
+# --- 🎨 UI 設定：韓系質感風 (Korean Aesthetic / Neutral Beige) ---
+THEME_COLOR = "#AFA499"  # 燕麥灰棕 (主色)
+ACCENT_COLOR = "#504A45" # 深拿鐵 (文字與重點標示)
+BG_COLOR = "#F7F6F3"     # 奶油米白 (背景)
 CARD_COLOR = "#FFFFFF"   # 純白卡片
 
 TIME_OPTIONS = []
@@ -51,9 +51,9 @@ for h in range(8, 18):
         TIME_OPTIONS.append(time(h, m))
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="行銷部會議預約", page_icon="🌿", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="行銷部會議預約", page_icon="🤎", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 😂 每日笑話資料庫 (更新版) ---
+# --- 😂 每日笑話資料庫 ---
 JOKES_DB = [
     "積德行善的相反是什麼？柯南行兇 (基德行善)",
     "木魚掉到水裡變什麼?濕木魚 (虱目魚)",
@@ -78,11 +78,11 @@ if logo_file:
         logo = Image.open(logo_file)
         col_logo, col_title = st.columns([1, 5])
         with col_logo: st.image(logo, width=100)
-        with col_title: st.title("🌿 行銷部會議預約")
+        with col_title: st.title("🤎 行銷部會議預約")
     except:
-        st.title("🌿 行銷部會議預約")
+        st.title("🤎 行銷部會議預約")
 else:
-    st.title("🌿 行銷部會議預約")
+    st.title("🤎 行銷部會議預約")
 
 # --- 📸 部門合照 ---
 team_photo_file = None
@@ -117,7 +117,43 @@ def get_worksheet():
         except: return None
     return None
 
-# --- 🔥 笑話管理函數 (加入快取機制) ---
+# --- 🔥 新增：休假管理函數 ---
+def get_leaves_worksheet():
+    gc = get_gc()
+    if gc:
+        try:
+            sh = gc.open_by_url(SHEET_URL)
+            try:
+                ws = sh.worksheet("Leaves")
+            except:
+                ws = sh.add_worksheet(title="Leaves", rows=50, cols=2)
+                ws.update('A1:B1', [['Date', 'Reason']])
+            return ws
+        except: return None
+    return None
+
+@st.cache_data(ttl=5)
+def load_leaves_data():
+    ws = get_leaves_worksheet()
+    if ws:
+        try:
+            df = get_as_dataframe(ws, usecols=[0, 1], parse_dates=False, dtype=str)
+            df = df.dropna(how='all'); df = df.fillna("")
+            df = df[df['Date'].str.len() > 0]
+            return df
+        except: pass
+    return pd.DataFrame(columns=["Date", "Reason"])
+
+def save_leaves_data(df):
+    ws = get_leaves_worksheet()
+    if ws:
+        try:
+            cols = ["Date", "Reason"]
+            df = df[cols]
+            ws.clear(); set_with_dataframe(ws, df); load_leaves_data.clear()
+        except Exception as e: st.error(f"寫入失敗: {e}")
+
+# --- 🔥 笑話管理函數 ---
 def get_jokes_worksheet():
     gc = get_gc()
     if gc:
@@ -132,27 +168,21 @@ def get_jokes_worksheet():
         except: return None
     return None
 
-# 🔥 關鍵修改：加入 ttl=600 (10分鐘快取)，避免頻繁讀取導致額度超標
 @st.cache_data(ttl=600)
 def fetch_custom_jokes_from_sheet():
     custom_jokes = []
     try:
         ws = get_jokes_worksheet()
         if ws:
-            # 讀取第一欄所有資料
             vals = ws.col_values(1)
-            if len(vals) > 1: # 排除標題
-                custom_jokes = vals[1:]
+            if len(vals) > 1: custom_jokes = vals[1:]
     except: pass
     return custom_jokes
 
 def get_all_jokes():
-    # 讀取內建笑話
     all_jokes = JOKES_DB.copy()
-    # 讀取自訂笑話 (有快取保護)
     custom_jokes = fetch_custom_jokes_from_sheet()
-    if custom_jokes:
-        all_jokes.extend(custom_jokes)
+    if custom_jokes: all_jokes.extend(custom_jokes)
     return all_jokes
 
 def add_new_joke(joke_text):
@@ -160,7 +190,6 @@ def add_new_joke(joke_text):
     if ws:
         try:
             ws.append_row([joke_text])
-            # 🔥 投稿成功後，清除快取，這樣下次讀取才會看到新的
             fetch_custom_jokes_from_sheet.clear()
             return True
         except: return False
@@ -169,12 +198,8 @@ def add_new_joke(joke_text):
 def get_daily_joke():
     full_db = get_all_jokes()
     if not full_db: return "今天沒有笑話..."
-    
-    # 🔥 改良：使用「台灣時間」的「日期字串」作為隨機種子
     tw_now = datetime.utcnow() + timedelta(hours=8)
-    seed_val = tw_now.strftime("%Y%m%d") # 例如: 20231027
-    
-    # 使用獨立的隨機產生器，不影響全域 random
+    seed_val = tw_now.strftime("%Y%m%d")
     rng = random.Random(seed_val)
     return rng.choice(full_db)
 
@@ -220,15 +245,15 @@ def update_mood_count(mood_to_add):
 # --- 😂 每日一笑 (更新風格) ---
 st.markdown(f"""
     <div style="
-        background-color: #E8F5E9; 
+        background-color: #EFECE9; 
         padding: 15px; 
-        border-radius: 15px; 
-        border: 2px solid {THEME_COLOR}; 
+        border-radius: 12px; 
+        border: 1px solid {THEME_COLOR}; 
         color: {ACCENT_COLOR};
         margin-bottom: 20px;
         text-align: center;
         font-family: 'Helvetica', sans-serif;">
-        🍵 <b>Daily Smile：</b> {get_daily_joke()} 🍵
+        ✨ <b>Daily Smile：</b> {get_daily_joke()} ✨
     </div>
 """, unsafe_allow_html=True)
 
@@ -238,7 +263,7 @@ with st.expander("🙋 我也想講笑話！(投稿)", expanded=False):
     if st.button("➕ 送出笑話", use_container_width=True):
         if new_joke_input:
             if add_new_joke(new_joke_input):
-                st.success("笑話已投稿成功！感謝你的幽默感 💖")
+                st.success("笑話已投稿成功！感謝你的幽默感 🤎")
                 st.balloons()
             else:
                 st.error("投稿失敗，請檢查連線")
@@ -280,51 +305,52 @@ else:
 
 st.markdown("---")
 
-# --- 🎨 CSS 優化 (清新抹茶風) ---
+# --- 🎨 CSS 優化 (韓系質感風) ---
 st.markdown(f"""
     <style>
-    /* 全站背景 - 牛奶白綠 */
+    /* 全站背景 - 奶油米白 */
     .stApp {{ background-color: {BG_COLOR}; }}
     
-    /* 標題文字 - 深焙茶綠 */
+    /* 標題文字 - 深拿鐵 */
     h1, h2, h3, p, label, div {{
         color: {ACCENT_COLOR} !important;
-        font-family: 'Helvetica Neue', sans-serif;
+        font-family: 'Helvetica Neue', 'Segoe UI', sans-serif;
     }}
 
-    /* 按鈕樣式 - 抹茶綠漸層 */
+    /* 按鈕樣式 - 質感灰棕 */
     .stButton>button {{
-        background: linear-gradient(135deg, {THEME_COLOR} 0%, #43A047 100%);
+        background-color: {THEME_COLOR};
         color: white !important;
-        border: none;
-        border-radius: 12px; /* 稍微方一點點，比較現代 */
+        border: 1px solid #9D9185;
+        border-radius: 8px; /* 質感小圓角 */
         padding: 10px 24px;
-        box-shadow: 0 4px 6px rgba(46, 125, 50, 0.2);
-        transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
     }}
     .stButton>button:hover {{
         transform: translateY(-2px);
-        box-shadow: 0 6px 10px rgba(46, 125, 50, 0.3);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        background-color: #9D9185;
     }}
     
     /* 卡片區塊 */
     div[data-testid="stExpander"] {{
         background-color: {CARD_COLOR};
-        border-radius: 12px;
-        border: 1px solid #C8E6C9; /* 淡綠色邊框 */
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border-radius: 8px;
+        border: 1px solid #EBE6E0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
     }}
     
     /* 輸入框 */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {{
-        border-radius: 8px;
+        border-radius: 6px;
         background-color: #FFFFFF;
-        border: 1px solid #A5D6A7; /* 綠色邊框 */
+        border: 1px solid #D1CAC3;
     }}
 
     a {{ color: {THEME_COLOR}; text-decoration: none; border-bottom: 1px dotted {THEME_COLOR}; }}
     
-    img {{ border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }}
+    img {{ border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -344,10 +370,10 @@ def send_notification_email(booking_data):
     subject = f"【會議預約通知】{booking_data['大名']} 申請了會議"
     
     body = f"""
-    <div style="font-family: Arial, sans-serif; padding: 20px; color: #2E7D32; background-color: #F1F8E9;">
-        <h3 style="color: {THEME_COLOR};">🍃 收到新的會議室預約申請</h3>
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: {ACCENT_COLOR}; background-color: {BG_COLOR};">
+        <h3 style="color: {THEME_COLOR};">🤎 收到新的會議室預約申請</h3>
         <p>請管理員登入系統進行審核。</p>
-        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border-left: 5px solid {THEME_COLOR}; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 8px; border-left: 5px solid {THEME_COLOR}; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
             <ul style="list-style-type: none; padding: 0;">
                 <li style="margin-bottom: 10px;"><b>👤 預約人：</b> {booking_data['大名']}</li>
                 <li style="margin-bottom: 10px;"><b>📅 日期：</b> {booking_data['日期']}</li>
@@ -359,7 +385,7 @@ def send_notification_email(booking_data):
         </div>
         <br>
         <center>
-            <a href="https://share.streamlit.io" style="background-color: {THEME_COLOR}; color: white; padding: 12px 25px; text-decoration: none; border-radius: 20px; font-weight: bold;">前往審核</a>
+            <a href="https://share.streamlit.io" style="background-color: {THEME_COLOR}; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold;">前往審核</a>
         </center>
     </div>
     """
@@ -383,9 +409,9 @@ def send_deletion_email(booking_data):
     
     body = f"""
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #555; background-color: #FAFAFA;">
-        <h3 style="color: #E57373;">🗑️ 會議已取消</h3>
+        <h3 style="color: #D32F2F;">🗑️ 會議已取消</h3>
         <p>同仁已在前台自行取消以下預約，請知悉。</p>
-        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border: 1px solid #E57373;">
+        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 8px; border: 1px solid #E57373;">
             <ul style="list-style-type: none; padding: 0;">
                 <li style="margin-bottom: 10px;"><b>👤 取消人：</b> {booking_data['大名']}</li>
                 <li style="margin-bottom: 10px;"><b>📅 原定日期：</b> {booking_data['日期']}</li>
@@ -445,7 +471,7 @@ def check_overlap(df, check_date, start_t, end_t):
 # --- 彈跳視窗 ---
 @st.dialog("🎉 申請成功！")
 def show_success_message():
-    st.subheader("Thank You! 💖")
+    st.subheader("Thank You! 🤎")
     st.write("已通知主管進行審核。")
     thank_you_file = None
     for ext in ["jpg", "jpeg", "png"]:
@@ -460,47 +486,55 @@ def show_success_message():
     st.balloons()
     if st.button("好的，我知道了", type="primary"): st.rerun()
 
-@st.dialog("📋 會議詳細資訊")
+@st.dialog("📋 會議/休假 詳細資訊")
 def show_event_details(event_props):
     st.markdown(f"### **{event_props.get('content', '無內容')}**")
     st.write("---")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.caption("📍 地點")
-        st.info(event_props.get('location', '未指定'))
-        st.caption("👥 與會人")
-        st.text(event_props.get('attendees') if event_props.get('attendees') else "（無）")
-    with c2:
-        st.caption("👤 預約人")
-        st.info(event_props.get('name', '未知'))
-        st.caption("⏰ 時間")
-        st.warning(event_props.get('pretty_time', ''))
-    if event_props.get('status'):
-        st.caption("📌 狀態")
-        st.write(event_props.get('status'))
     
-    st.write("---")
-    st.caption("⚠️ 操作區")
-    if st.button("🗑️ 我要取消這個預約", type="primary", use_container_width=True, help="請確認這是您的預約再刪除"):
-        current_df = load_data()
-        if not current_df.empty:
-            mask = (
-                (current_df['日期'] == event_props.get('raw_date')) & 
-                (current_df['開始時間'] == event_props.get('raw_start')) & 
-                (current_df['結束時間'] == event_props.get('raw_end')) & 
-                (current_df['會議地點'] == event_props.get('location'))
-            )
-            
-            if not current_df[mask].empty:
-                row_to_delete = current_df[mask].iloc[0]
-                new_df = current_df[~mask]
-                save_data(new_df)
-                with st.spinner("正在取消並發送通知..."):
-                    send_deletion_email(row_to_delete)
-                st.success("預約已取消！")
-                st.rerun()
-            else:
-                st.error("❌ 找不到此預約，可能已經被刪除了。")
+    # 若為系統休假，顯示不同樣式
+    if event_props.get('status') == "不可預約":
+        st.warning("⚠️ 此日期已被設定為休假/不可預約。")
+        st.caption("📍 地點")
+        st.info("全天")
+        st.caption("👤 設定人")
+        st.info("系統管理員")
+    else:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.caption("📍 地點")
+            st.info(event_props.get('location', '未指定'))
+            st.caption("👥 與會人")
+            st.text(event_props.get('attendees') if event_props.get('attendees') else "（無）")
+        with c2:
+            st.caption("👤 預約人")
+            st.info(event_props.get('name', '未知'))
+            st.caption("⏰ 時間")
+            st.warning(event_props.get('pretty_time', ''))
+        if event_props.get('status'):
+            st.caption("📌 狀態")
+            st.write(event_props.get('status'))
+        
+        st.write("---")
+        st.caption("⚠️ 操作區")
+        if st.button("🗑️ 我要取消這個預約", type="primary", use_container_width=True, help="請確認這是您的預約再刪除"):
+            current_df = load_data()
+            if not current_df.empty:
+                mask = (
+                    (current_df['日期'] == event_props.get('raw_date')) & 
+                    (current_df['開始時間'] == event_props.get('raw_start')) & 
+                    (current_df['結束時間'] == event_props.get('raw_end')) & 
+                    (current_df['會議地點'] == event_props.get('location'))
+                )
+                if not current_df[mask].empty:
+                    row_to_delete = current_df[mask].iloc[0]
+                    new_df = current_df[~mask]
+                    save_data(new_df)
+                    with st.spinner("正在取消並發送通知..."):
+                        send_deletion_email(row_to_delete)
+                    st.success("預約已取消！")
+                    st.rerun()
+                else:
+                    st.error("❌ 找不到此預約，可能已經被刪除了。")
 
 # --- 主程式 ---
 st.sidebar.header("🔒 管理員專區")
@@ -514,6 +548,54 @@ if is_admin:
     if st.sidebar.button("🚪 登出 / 回首頁"): logout(); st.rerun()
     
     st.markdown(f"<h3 style='color:{THEME_COLOR}'>📋 審核後台</h3>", unsafe_allow_html=True)
+    
+    # 🔥 管理員新增休假/不可預約日期 區塊
+    with st.expander("📅 設定休假 / 不可預約日期", expanded=False):
+        st.write("設定後，前台日曆會顯示全天不可預約，且同仁無法選擇該日期。")
+        c_date, c_reason, c_btn = st.columns([2, 2, 1])
+        new_leave_date = c_date.date_input("選擇日期", min_value=datetime.today())
+        new_leave_reason = c_reason.text_input("事由 (例: 員工旅遊)", placeholder="必填")
+        
+        if c_btn.button("➕ 新增", use_container_width=True):
+            if new_leave_reason:
+                l_df = load_leaves_data()
+                new_row = {"Date": new_leave_date.strftime("%Y-%m-%d"), "Reason": new_leave_reason}
+                if l_df.empty:
+                    l_df = pd.DataFrame([new_row])
+                else:
+                    # 避免重複欄位
+                    if "刪除" in l_df.columns: l_df = l_df.drop(columns=["刪除"])
+                    l_df = pd.concat([l_df, pd.DataFrame([new_row])], ignore_index=True)
+                save_leaves_data(l_df)
+                st.success("已新增休假日！")
+                st.rerun()
+            else:
+                st.warning("請填寫事由")
+                
+        st.markdown("---")
+        st.write("🛠️ **管理已設定的日期**")
+        l_df = load_leaves_data()
+        if not l_df.empty:
+            l_df["刪除"] = False
+            edited_leaves = st.data_editor(
+                l_df,
+                column_config={
+                    "Date": st.column_config.TextColumn("日期 (YYYY-MM-DD)", disabled=True),
+                    "Reason": st.column_config.TextColumn("事由"),
+                    "刪除": st.column_config.CheckboxColumn("🗑️ 刪除")
+                },
+                num_rows="dynamic", key="admin_leaves", use_container_width=True
+            )
+            if st.button("💾 儲存休假變更", type="primary", use_container_width=True):
+                final_leaves = edited_leaves[edited_leaves["刪除"] == False].drop(columns=["刪除"])
+                save_leaves_data(final_leaves)
+                st.success("休假設定已更新")
+                st.rerun()
+        else:
+            st.info("目前無休假設定。")
+
+    st.write("---")
+
     load_data.clear(); df = load_data()
     if not df.empty:
         df["刪除"] = False
@@ -525,13 +607,13 @@ if is_admin:
                 "與會人": st.column_config.TextColumn("與會人"),
                 "刪除": st.column_config.CheckboxColumn(label="🗑️ 刪除", help="勾選並儲存以刪除資料")
             },
-            num_rows="dynamic", key="admin", use_container_width=True
+            num_rows="dynamic", key="admin_bookings", use_container_width=True
         )
-        if st.button("💾 儲存變更", type="primary", use_container_width=True):
+        if st.button("💾 儲存預約變更", type="primary", use_container_width=True):
             final_df = edited_df[edited_df["刪除"] == False]
             final_df = final_df.drop(columns=["刪除"])
             save_data(final_df)
-            st.success("已更新")
+            st.success("已更新預約資料")
             st.rerun()
 else:
     with st.expander("➕ 申請預約 (需審核)", expanded=True):
@@ -551,9 +633,24 @@ else:
             e_time = c6.selectbox("結束", TIME_OPTIONS, index=2)
             content = st.text_input("內容 (必填)")
             if st.form_submit_button("送出", use_container_width=True):
+                # 載入所有資料
                 load_data.clear(); df = load_data()
-                if not name or not content: st.error("❌ 請填寫必填欄位")
-                elif s_time >= e_time: st.error("❌ 時間錯誤：結束時間必須晚於開始時間")
+                leaves_df = load_leaves_data()
+                
+                # 檢查是否為休假日
+                date_str = date_val.strftime("%Y-%m-%d")
+                is_leave = False
+                leave_reason = ""
+                if not leaves_df.empty and date_str in leaves_df['Date'].values:
+                    is_leave = True
+                    leave_reason = leaves_df[leaves_df['Date'] == date_str].iloc[0]['Reason']
+
+                if not name or not content: 
+                    st.error("❌ 請填寫必填欄位")
+                elif is_leave:
+                    st.error(f"❌ 無法預約：該日期已設定為「{leave_reason}」")
+                elif s_time >= e_time: 
+                    st.error("❌ 時間錯誤：結束時間必須晚於開始時間")
                 else:
                     conflict = check_overlap(df, date_val, s_time, e_time)
                     if conflict: st.error(f"❌ 衝突：該時段已被「{conflict}」預約")
@@ -562,16 +659,18 @@ else:
                         save_data(pd.concat([df, pd.DataFrame([new_row])], ignore_index=True))
                         send_notification_email(new_row); show_success_message()
 
-st.markdown(f"<hr style='border-top: 2px dashed {THEME_COLOR};'>", unsafe_allow_html=True)
+st.markdown(f"<hr style='border-top: 1px solid #EBE6E0;'>", unsafe_allow_html=True)
 
 # --- 行事曆 ---
 df = load_data()
+leaves_df = load_leaves_data()
 current_view = "timeGridWeek"
 
 events = []
 if "calendar_date" not in st.session_state:
     st.session_state["calendar_date"] = datetime.today().isoformat()
 
+# 1. 載入一般預約
 if not df.empty and '日期' in df.columns:
     for _, row in df.iterrows():
         try:
@@ -581,8 +680,8 @@ if not df.empty and '日期' in df.columns:
             start_t = fix_time(row['開始時間']); end_t = fix_time(row['結束時間'])
             if not start_t or not end_t: continue
             loc = row.get('會議地點', '未指定'); bg_color = THEME_COLOR
-            if status == '待審核': bg_color = "#F39C12"
-            elif status == '拒絕': bg_color = "#7F8C8D"
+            if status == '待審核': bg_color = "#D4A59A" # 柔和粉
+            elif status == '拒絕': bg_color = "#9E9E9E" # 灰
             title_text = f"[{loc}] {row['大名']}"
             if is_admin: title_text = f"({status}) {title_text}"
             
@@ -603,10 +702,29 @@ if not df.empty and '日期' in df.columns:
             })
         except: continue
 
+# 2. 載入休假/停用日期 (全天事件)
+if not leaves_df.empty:
+    for _, row in leaves_df.iterrows():
+        try:
+            clean_date = str(row['Date']).replace('/', '-').strip()
+            events.append({
+                "title": f"🚫 {row['Reason']}",
+                "start": clean_date, # 只給日期就會變成全天事件
+                "allDay": True,
+                "backgroundColor": "#D6CFC7", # 柔和灰色
+                "borderColor": "#C2B8B2",
+                "textColor": "#4E4B46",
+                "extendedProps": {
+                    "content": f"休假事由：{row['Reason']}",
+                    "status": "不可預約",
+                }
+            })
+        except: continue
+
 calendar_options = {
     "initialView": current_view,
     "headerToolbar": {"left": "today prev,next", "center": "title", "right": ""},
-    "height": "auto", "slotMinTime": "08:00:00", "slotMaxTime": "19:00:00", "allDaySlot": False,
+    "height": "auto", "slotMinTime": "08:00:00", "slotMaxTime": "19:00:00", "allDaySlot": True, # 開啟全天顯示槽
     "initialDate": st.session_state["calendar_date"],
 }
 
@@ -621,4 +739,4 @@ if calendar_state.get("datesSet"):
 if calendar_state.get("eventClick"):
     show_event_details(calendar_state["eventClick"]["event"]["extendedProps"])
 
-if is_admin: st.caption(f"🟦 核准 | 🟧 待審核 | ⬜ 拒絕")
+if is_admin: st.caption(f"🤎 核准 | 🌸 待審核 | ⚪ 拒絕 | 🚫 休假")
