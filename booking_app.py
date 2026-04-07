@@ -51,7 +51,7 @@ for h in range(8, 18):
         TIME_OPTIONS.append(time(h, m))
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="David會議預約", page_icon="🤎", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="David 預約系統", page_icon="🤎", layout="wide", initial_sidebar_state="collapsed")
 
 # --- 😂 每日笑話資料庫 ---
 JOKES_DB = [
@@ -78,11 +78,11 @@ if logo_file:
         logo = Image.open(logo_file)
         col_logo, col_title = st.columns([1, 5])
         with col_logo: st.image(logo, width=100)
-        with col_title: st.title("🤎 行銷部會議預約")
+        with col_title: st.title("🤎 David 預約系統")
     except:
-        st.title("🤎 行銷部會議預約")
+        st.title("🤎 David 預約系統")
 else:
-    st.title("🤎 行銷部會議預約")
+    st.title("🤎 David 預約系統")
 
 # --- 📸 部門合照 ---
 team_photo_file = None
@@ -95,7 +95,7 @@ for filename in possible_filenames:
 if team_photo_file:
     try:
         team_photo = Image.open(team_photo_file) 
-        st.image(team_photo, use_container_width=True, caption="Marketing Team ✨")
+        st.image(team_photo, use_container_width=True, caption="Welcome! ✨")
     except: pass
 
 # --- 連線函數 ---
@@ -367,11 +367,11 @@ def send_notification_email(booking_data):
     sender_email = st.secrets["email"]["sender"]
     sender_password = st.secrets["email"]["password"]
     receiver_email = st.secrets["email"]["receiver"]
-    subject = f"【會議預約通知】{booking_data['大名']} 申請了會議"
+    subject = f"【David預約系統】{booking_data['大名']} 申請了會議"
     
     body = f"""
     <div style="font-family: Arial, sans-serif; padding: 20px; color: {ACCENT_COLOR}; background-color: {BG_COLOR};">
-        <h3 style="color: {THEME_COLOR};">🤎 收到新的會議室預約申請</h3>
+        <h3 style="color: {THEME_COLOR};">🤎 收到新的預約申請</h3>
         <p>請管理員登入系統進行審核。</p>
         <div style="background-color: #FFFFFF; padding: 20px; border-radius: 8px; border-left: 5px solid {THEME_COLOR}; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
             <ul style="list-style-type: none; padding: 0;">
@@ -405,11 +405,11 @@ def send_deletion_email(booking_data):
     sender_email = st.secrets["email"]["sender"]
     sender_password = st.secrets["email"]["password"]
     receiver_email = st.secrets["email"]["receiver"]
-    subject = f"【會議取消通知】{booking_data['大名']} 取消了會議"
+    subject = f"【David預約系統】{booking_data['大名']} 取消了會議"
     
     body = f"""
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #555; background-color: #FAFAFA;">
-        <h3 style="color: #D32F2F;">🗑️ 會議已取消</h3>
+        <h3 style="color: #D32F2F;">🗑️ 預約已取消</h3>
         <p>同仁已在前台自行取消以下預約，請知悉。</p>
         <div style="background-color: #FFFFFF; padding: 20px; border-radius: 8px; border: 1px solid #E57373;">
             <ul style="list-style-type: none; padding: 0;">
