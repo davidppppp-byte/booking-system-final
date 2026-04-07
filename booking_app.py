@@ -51,7 +51,7 @@ for h in range(8, 18):
         TIME_OPTIONS.append(time(h, m))
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="行銷部會議預約", page_icon="🤎", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="David會議預約", page_icon="🤎", layout="wide", initial_sidebar_state="collapsed")
 
 # --- 😂 每日笑話資料庫 ---
 JOKES_DB = [
