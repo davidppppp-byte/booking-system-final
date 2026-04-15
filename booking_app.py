@@ -30,16 +30,16 @@ LOCATION_SLOGANS = {
     "行銷部辦公室": "🚀 創意發射基地！",
     "崇德門市": "🏪 前線支援！聽聽顧客的聲音。",
     "生產中心": "🛠️ 這裡產出的不只是產品，還有職人精神。",
-    "物流中心": "📦 使命必達！效率就是我們的名字。",
+    "物流中心": "📦 使命必達！效率針對是我們的名字。",
     "線上": "🌐 距離不是問題，網路把我們連在一起。",
     "外部": "🌍 世界那麼大，去外面看看吧！"
 }
 
-# --- 🎨 UI 設定：科技專業感 (Premium Tech Vibe) ---
-THEME_COLOR = "#00D2FF"  # 霓虹藍 (主色/高亮)
-ACCENT_COLOR = "#E2E8F0" # 銀灰色 (文字與重點標示)
-BG_COLOR = "#0F172A"     # 深空灰/藏青色 (背景)
-CARD_COLOR = "#1E293B"   # 鐵灰色 (純白卡片)
+# --- 🎨 UI 設定：商務高級感 (Business Premium Light Mode) ---
+THEME_COLOR = "#1D4ED8"  # 專業藍 (Corporate Blue - 主色/高亮)
+ACCENT_COLOR = "#1E293B" # 深灰黑 (Slate 800 - 文字與重點標示)
+BG_COLOR = "#F8FAFC"     # 淺灰白 (Slate 50 - 舒適背景)
+CARD_COLOR = "#FFFFFF"   # 純白 (白底卡片，創造層次)
 
 TIME_OPTIONS = []
 for h in range(8, 18): 
@@ -48,7 +48,7 @@ for h in range(8, 18):
         TIME_OPTIONS.append(time(h, m))
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="David 預約系統", page_icon="🚀", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="David 預約系統", page_icon="💼", layout="wide", initial_sidebar_state="collapsed")
 
 # --- 😂 每日笑話資料庫 ---
 JOKES_DB = [
@@ -75,11 +75,11 @@ if logo_file:
         logo = Image.open(logo_file)
         col_logo, col_title = st.columns([1, 5])
         with col_logo: st.image(logo, width=100)
-        with col_title: st.markdown(f"<h1 style='color: {THEME_COLOR};'>🚀 David 預約系統</h1>", unsafe_allow_html=True)
+        with col_title: st.markdown(f"<h1 style='color: {THEME_COLOR};'>💼 David 預約系統</h1>", unsafe_allow_html=True)
     except:
-        st.markdown(f"<h1 style='color: {THEME_COLOR};'>🚀 David 預約系統</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='color: {THEME_COLOR};'>💼 David 預約系統</h1>", unsafe_allow_html=True)
 else:
-    st.markdown(f"<h1 style='color: {THEME_COLOR};'>🚀 David 預約系統</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='color: {THEME_COLOR};'>💼 David 預約系統</h1>", unsafe_allow_html=True)
 
 # --- 📸 部門合照 ---
 team_photo_file = None
@@ -200,7 +200,7 @@ def get_daily_joke():
     rng = random.Random(seed_val)
     return rng.choice(full_db)
 
-# --- 😂 每日一笑 (科技感框) ---
+# --- 😂 每日一笑 (商務質感框) ---
 st.markdown(f"""
     <div style="
         background-color: {CARD_COLOR}; 
@@ -211,7 +211,10 @@ st.markdown(f"""
         margin-bottom: 20px;
         text-align: center;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border-top: 1px solid #E2E8F0;
+        border-right: 1px solid #E2E8F0;
+        border-bottom: 1px solid #E2E8F0;">
         ⚡ <b>Daily Log：</b> {get_daily_joke()}
     </div>
 """, unsafe_allow_html=True)
@@ -230,59 +233,59 @@ with st.expander("💬 提供系統新笑話 (投稿)", expanded=False):
 
 st.markdown("---")
 
-# --- 🎨 CSS 優化 (科技專業風) ---
+# --- 🎨 CSS 優化 (商務專業風 Light Mode) ---
 st.markdown(f"""
     <style>
-    /* 全站背景 - 深空藍黑 */
+    /* 全站背景 - 淺灰白 */
     .stApp {{ background-color: {BG_COLOR}; }}
     
-    /* 標題與文字 - 銀灰色 */
+    /* 標題與文字 - 深灰黑 */
     h1, h2, h3, p, label, div {{
         color: {ACCENT_COLOR} !important;
         font-family: 'Inter', 'Segoe UI', sans-serif;
     }}
 
-    /* 按鈕樣式 - 科技漸層發光 */
+    /* 按鈕樣式 - 專業質感藍 */
     .stButton>button {{
-        background: linear-gradient(135deg, #0052D4, #4364F7);
+        background: linear-gradient(135deg, #1E3A8A, #2563EB);
         color: #FFFFFF !important;
-        border: 1px solid #3A5FCD;
+        border: none;
         border-radius: 6px; 
         padding: 10px 24px;
-        font-weight: bold;
-        letter-spacing: 1px;
-        box-shadow: 0 4px 15px rgba(0, 82, 212, 0.3);
-        transition: all 0.3s ease;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        transition: all 0.2s ease;
     }}
     .stButton>button:hover {{
-        transform: translateY(-2px);
-        box-shadow: 0 0 15px rgba(0, 210, 255, 0.6);
-        border: 1px solid {THEME_COLOR};
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+        background: linear-gradient(135deg, #1E40AF, #1D4ED8);
     }}
     
     /* 卡片區塊 */
     div[data-testid="stExpander"] {{
         background-color: {CARD_COLOR};
         border-radius: 8px;
-        border: 1px solid #334155;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }}
     
     /* 輸入框 */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {{
         border-radius: 6px;
-        background-color: #0F172A !important;
-        color: {THEME_COLOR} !important;
-        border: 1px solid #334155;
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
+        border: 1px solid #CBD5E1;
     }}
     
     /* 游標/聚焦效果 */
     .stTextInput>div>div>input:focus, .stSelectbox>div>div>div:focus {{
         border: 1px solid {THEME_COLOR} !important;
-        box-shadow: 0 0 8px rgba(0, 210, 255, 0.4) !important;
+        box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.15) !important;
     }}
 
-    /* 行事曆內部字體顏色修復 (確保在深色模式下清晰可見) */
+    /* 行事曆內部字體顏色修復 */
     .fc-event-title, .fc-event-time {{
         color: #FFFFFF !important;
         font-weight: 500;
@@ -290,7 +293,7 @@ st.markdown(f"""
 
     a {{ color: {THEME_COLOR}; text-decoration: none; border-bottom: 1px dotted {THEME_COLOR}; }}
     
-    img {{ border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); opacity: 0.9; }}
+    img {{ border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); opacity: 0.95; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -310,10 +313,10 @@ def send_notification_email(booking_data):
     subject = f"[SYSTEM] 預約申請：{booking_data['大名']}"
     
     body = f"""
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #E2E8F0; background-color: #0F172A;">
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #1E293B; background-color: #F8FAFC;">
         <h3 style="color: {THEME_COLOR};">🔵 新的預約申請 (New Request)</h3>
         <p>系統已記錄新的預約，請管理員登入系統進行審核。</p>
-        <div style="background-color: #1E293B; padding: 20px; border-radius: 6px; border-left: 4px solid {THEME_COLOR}; box-shadow: 0 2px 10px rgba(0,0,0,0.5);">
+        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 6px; border-left: 4px solid {THEME_COLOR}; border: 1px solid #E2E8F0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
             <ul style="list-style-type: none; padding: 0;">
                 <li style="margin-bottom: 10px;"><b>👤 預約人：</b> {booking_data['大名']}</li>
                 <li style="margin-bottom: 10px;"><b>📅 日期：</b> {booking_data['日期']}</li>
@@ -325,7 +328,7 @@ def send_notification_email(booking_data):
         </div>
         <br>
         <center>
-            <a href="https://share.streamlit.io" style="background-color: #0052D4; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; font-family: sans-serif;">登入審核</a>
+            <a href="https://share.streamlit.io" style="background-color: #2563EB; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; font-family: sans-serif;">登入審核</a>
         </center>
     </div>
     """
@@ -348,10 +351,10 @@ def send_deletion_email(booking_data):
     subject = f"[SYSTEM] 預約取消：{booking_data['大名']}"
     
     body = f"""
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #E2E8F0; background-color: #0F172A;">
-        <h3 style="color: #F87171;">🔴 預約已取消 (Request Canceled)</h3>
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #1E293B; background-color: #F8FAFC;">
+        <h3 style="color: #DC2626;">🔴 預約已取消 (Request Canceled)</h3>
         <p>同仁已在前台自行取消以下預約，請知悉。</p>
-        <div style="background-color: #1E293B; padding: 20px; border-radius: 6px; border-left: 4px solid #F87171;">
+        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 6px; border-left: 4px solid #DC2626; border: 1px solid #E2E8F0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
             <ul style="list-style-type: none; padding: 0;">
                 <li style="margin-bottom: 10px;"><b>👤 取消人：</b> {booking_data['大名']}</li>
                 <li style="margin-bottom: 10px;"><b>📅 原定日期：</b> {booking_data['日期']}</li>
@@ -587,7 +590,7 @@ else:
                         save_data(pd.concat([df, pd.DataFrame([new_row])], ignore_index=True))
                         send_notification_email(new_row); show_success_message()
 
-st.markdown(f"<hr style='border-top: 1px solid #334155;'>", unsafe_allow_html=True)
+st.markdown(f"<hr style='border-top: 1px solid #CBD5E1;'>", unsafe_allow_html=True)
 
 # --- 行事曆 ---
 df = load_data()
@@ -615,9 +618,9 @@ if not df.empty and '日期' in df.columns:
             title_text = f"[{loc}] {row['大名']}｜{content}"
             if is_admin: title_text = f"({status}) {title_text}"
 
-            bg_color = "#0284C7" # Tech Blue
-            if status == '待審核': bg_color = "#D97706" # Warning Amber
-            elif status == '拒絕': bg_color = "#475569" # Slate
+            bg_color = "#2563EB" # Professional Blue
+            if status == '待審核': bg_color = "#F59E0B" # Amber Pending
+            elif status == '拒絕': bg_color = "#94A3B8" # Slate Rejected
             
             events.append({
                 "title": title_text, "start": f"{clean_date}T{start_t}", "end": f"{clean_date}T{end_t}",
@@ -645,9 +648,9 @@ if not leaves_df.empty:
                 "title": f"🚫 系統鎖定: {row['Reason']}",
                 "start": clean_date, 
                 "allDay": True,
-                "backgroundColor": "#334155", # Dark Slate
-                "borderColor": "#475569",
-                "textColor": "#F8FAFC",
+                "backgroundColor": "#F1F5F9", # Light Gray
+                "borderColor": "#CBD5E1",
+                "textColor": "#475569",
                 "extendedProps": {
                     "content": f"鎖定事由：{row['Reason']}",
                     "status": "不可預約",
