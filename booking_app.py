@@ -376,6 +376,38 @@ def send_deletion_email(booking_data):
         st.toast("📧 取消通知已發送！", icon="✅")
     except: pass
 
+def send_rejection_email(booking_data):
+    if "email" not in st.secrets: return
+    sender_email = st.secrets["email"]["sender"]
+    sender_password = st.secrets["email"]["password"]
+    receiver_email = st.secrets["email"]["receiver"]
+    subject = f"[SYSTEM] 預約未核准：{booking_data['大名']}"
+    
+    body = f"""
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #1E293B; background-color: #F8FAFC;">
+        <h3 style="color: #EA580C;">🟠 預約未核准 (Request Rejected)</h3>
+        <p>您好，以下會議室預約申請未能通過審核，如有疑問請洽系統管理員。</p>
+        <div style="background-color: #FFFFFF; padding: 20px; border-radius: 6px; border-left: 4px solid #EA580C; border: 1px solid #E2E8F0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <ul style="list-style-type: none; padding: 0;">
+                <li style="margin-bottom: 10px;"><b>👤 預約人：</b> {booking_data['大名']}</li>
+                <li style="margin-bottom: 10px;"><b>📅 日期：</b> {booking_data['日期']}</li>
+                <li style="margin-bottom: 10px;"><b>⏰ 時間：</b> {booking_data['開始時間']} ~ {booking_data['結束時間']}</li>
+                <li style="margin-bottom: 10px;"><b>📍 地點：</b> {booking_data['會議地點']}</li>
+                <li style="margin-bottom: 10px;"><b>📝 內容：</b> {booking_data['預約內容']}</li>
+            </ul>
+        </div>
+    </div>
+    """
+    msg = MIMEMultipart()
+    msg['From'] = sender_email; msg['To'] = receiver_email; msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls(); server.login(sender_email, sender_password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        server.quit()
+    except: pass
+
 @st.cache_data(ttl=5)
 def load_data():
     ws = get_worksheet()
@@ -541,10 +573,19 @@ if is_admin:
             num_rows="dynamic", key="admin_bookings", use_container_width=True
         )
         if st.button("💾 儲存資料表 (Save Database)", type="primary", use_container_width=True):
-            final_df = edited_df[edited_df["刪除"] == False]
-            final_df = final_df.drop(columns=["刪除"])
+            final_df = edited_df[edited_df["刪除"] == False].drop(columns=["刪除"])
+            
+            # 🔥 檢查是否有被改為「拒絕」的預約，並發信
+            with st.spinner("正在同步並發送通知..."):
+                for idx, row in final_df.iterrows():
+                    if idx in df.index:
+                        old_status = df.loc[idx, "狀態"]
+                        new_status = row["狀態"]
+                        if old_status != "拒絕" and new_status == "拒絕":
+                            send_rejection_email(row.to_dict())
+            
             save_data(final_df)
-            st.success("資料庫已同步。")
+            st.success("資料庫已同步，並已寄送相關通知信。")
             st.rerun()
 else:
     with st.expander("📝 建立新預約 (Create Booking)", expanded=True):
@@ -553,7 +594,11 @@ else:
             name = c1.text_input("預約人 (Applicant)", placeholder="必填")
             attendees = c2.text_input("與會人 (Attendees)", placeholder="選填")
             c3, c4 = st.columns(2)
-            date_val = c3.date_input("日期 (Date)", min_value=datetime.today())
+            
+            # 🔥 防呆：設定行事曆只能選今天(台灣時間)之後的日期
+            tw_today = (datetime.utcnow() + timedelta(hours=8)).date()
+            date_val = c3.date_input("日期 (Date)", min_value=tw_today)
+            
             loc = c4.selectbox("地點 (Location)", LOCATION_OPTIONS)
             
             if loc in LOCATION_SLOGANS:
@@ -578,6 +623,8 @@ else:
 
                 if not name or not content: 
                     st.error("❌ 請填寫必填欄位 (Required fields missing)")
+                elif date_val < tw_today:
+                    st.error("❌ 無法預約過去的日期 (Cannot book past dates)")
                 elif is_leave:
                     st.error(f"❌ 無法預約：該日期已設定為「{leave_reason}」")
                 elif s_time >= e_time: 
