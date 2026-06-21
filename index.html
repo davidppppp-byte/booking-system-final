@@ -83,10 +83,12 @@
   .hour-row{height:56px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);padding:5px 8px;box-sizing:border-box;}
   .timeline-grid{position:relative;flex:1;min-width:320px;}
   .hour-line{height:56px;border-bottom:1px solid #EFEAE0;}
-  .event-block{position:absolute;border-radius:8px;padding:6px 9px;color:#fff;font-size:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.18);line-height:1.35;}
+  .event-block{position:absolute;border-radius:8px;padding:4px 9px;color:#fff;font-size:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.18);line-height:1.3;}
   .event-block .et{font-family:var(--mono);font-weight:700;font-size:11.5px;}
   .event-block .es{font-weight:700;margin-top:1px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
   .event-block .em{opacity:.88;font-size:11px;margin-top:1px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+  .event-block.compact{display:flex;align-items:center;padding:0 9px;}
+  .event-block.compact .ec{font-size:11px;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .timeline-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:13.5px;}
   .block-band{position:absolute;left:4px;right:4px;border-radius:8px;background:repeating-linear-gradient(135deg, rgba(43,36,32,.88), rgba(43,36,32,.88) 10px, rgba(43,36,32,.74) 10px, rgba(43,36,32,.74) 20px);display:flex;align-items:center;padding:0 12px;overflow:hidden;z-index:1;}
   .block-label{color:#fff;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -716,7 +718,7 @@
       var startMin = timeToMinutes(ev.start) - DAY_START*60;
       var endMin = timeToMinutes(ev.end) - DAY_START*60;
       var top = (startMin/60) * HOUR_HEIGHT;
-      var height = Math.max(((endMin-startMin)/60) * HOUR_HEIGHT, 30);
+      var height = Math.max(((endMin-startMin)/60) * HOUR_HEIGHT, 20);
       var widthPct = 100/totalCols;
       var leftPct = ev._col * widthPct;
  
@@ -728,9 +730,18 @@
       block.style.width = 'calc(' + widthPct + '% - 8px)';
       block.style.background = locationInfo(ev.location).color;
       block.title = ev.start+'–'+ev.end+' '+ev.subject+'／'+ev.location+'／'+ev.applicant;
-      block.innerHTML = '<div class="et">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
-        '<div class="es">'+escapeHtml(ev.subject)+'</div>' +
-        '<div class="em">'+escapeHtml(ev.location)+' · '+escapeHtml(ev.applicant)+'</div>';
+ 
+      if(height >= 54){
+        block.innerHTML = '<div class="et">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
+          '<div class="es">'+escapeHtml(ev.subject)+'</div>' +
+          '<div class="em">'+escapeHtml(ev.location)+' · '+escapeHtml(ev.applicant)+'</div>';
+      } else if(height >= 38){
+        block.innerHTML = '<div class="et">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
+          '<div class="es">'+escapeHtml(ev.subject)+'</div>';
+      } else {
+        block.classList.add('compact');
+        block.innerHTML = '<div class="ec">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'　'+escapeHtml(ev.subject)+'</div>';
+      }
       grid.appendChild(block);
     });
  
