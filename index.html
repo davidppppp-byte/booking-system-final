@@ -88,6 +88,8 @@
   .event-block .es{font-weight:700;margin-top:1px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
   .event-block .em{opacity:.88;font-size:11px;margin-top:1px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
   .timeline-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:13.5px;}
+  .block-band{position:absolute;left:4px;right:4px;border-radius:8px;background:repeating-linear-gradient(135deg, rgba(43,36,32,.88), rgba(43,36,32,.88) 10px, rgba(43,36,32,.74) 10px, rgba(43,36,32,.74) 20px);display:flex;align-items:center;padding:0 12px;overflow:hidden;z-index:1;}
+  .block-label{color:#fff;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .now-line{position:absolute;left:0;right:0;border-top:2px solid #D9534F;z-index:5;}
   .now-dot{position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#D9534F;}
   .now-label{position:absolute;left:8px;top:-17px;font-size:10.5px;color:#D9534F;font-weight:700;font-family:var(--mono);background:#fff;padding:0 4px;border-radius:4px;}
@@ -232,12 +234,36 @@
         <button type="button" class="ghost-btn" id="backToMainBtn">返回預約頁面</button>
       </div>
     </div>
-    <p class="admin-sub">審核同仁送出的會議預約申請。</p>
+    <p class="admin-sub">審核同仁送出的會議預約申請，或自行封鎖時段（例如請假、已安排行程），讓同仁無法在該時段預約。</p>
  
     <div class="tabs">
       <button type="button" class="tab-btn" data-tab="pending">待審核 <span class="count" id="count-pending">0</span></button>
       <button type="button" class="tab-btn" data-tab="approved">已通過 <span class="count" id="count-approved">0</span></button>
       <button type="button" class="tab-btn" data-tab="rejected">已拒絕 <span class="count" id="count-rejected">0</span></button>
+      <button type="button" class="tab-btn" data-tab="blocked">封鎖時段 <span class="count" id="count-blocked">0</span></button>
+    </div>
+ 
+    <div id="blockFormCard" class="card hidden" style="margin-bottom:18px;">
+      <div class="form-grid">
+        <div class="field">
+          <label for="blockDateInput">日期<span class="req">*</span></label>
+          <input type="date" id="blockDateInput">
+        </div>
+        <div class="field">
+          <label for="blockReasonInput">事由<span class="opt">選填</span></label>
+          <input type="text" id="blockReasonInput" placeholder="例如：請假、出差、已有行程">
+        </div>
+        <div class="field">
+          <label for="blockStartInput">開始<span class="req">*</span></label>
+          <input type="time" id="blockStartInput" value="09:00">
+        </div>
+        <div class="field">
+          <label for="blockEndInput">結束<span class="req">*</span></label>
+          <input type="time" id="blockEndInput" value="10:00">
+        </div>
+        <div id="blockFormMsg" class="form-msg hidden"></div>
+        <button type="button" class="submit-btn" id="addBlockBtn">新增封鎖時段</button>
+      </div>
     </div>
  
     <div id="adminList"></div>
@@ -290,7 +316,7 @@
     {name:'生產中心', color:'#8C5A3C', tip:'生產相關討論，請留意現場作業時間。'},
     {name:'物流中心', color:'#6B7280', tip:'物流相關討論，請留意倉儲作業時間。'},
     {name:'外部', color:'#9C9488', tip:'外出洽公或於外部場地進行的會議。'},
-    {name:'線上', color:'#3E7D8C', tip:'視訊會議，請於會議內容欄位附上會議連結。'}
+    {name:'線上', color:'#3E7D8C', tip:''}
   ];
  
   // ============================================
@@ -344,7 +370,7 @@
     var d=new Date(iso);
     return (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes());
   }
-  function tabLabel(t){ return t==='pending'?'待審核':t==='approved'?'已通過':'已拒絕'; }
+  function tabLabel(t){ return t==='pending'?'待審核':t==='approved'?'已通過':t==='blocked'?'封鎖時段':'已拒絕'; }
  
   // ---------- supabase data layer ----------
   function rowToBooking(row){
@@ -358,6 +384,7 @@
       end: row.end_time,
       subject: row.subject,
       status: row.status,
+      type: row.type || 'meeting',
       createdAt: row.created_at
     };
   }
@@ -370,7 +397,8 @@
       start_time: b.start,
       end_time: b.end,
       subject: b.subject,
-      status: b.status || 'pending'
+      status: b.status || 'pending',
+      type: b.type || 'meeting'
     };
   }
  
@@ -424,6 +452,7 @@
     var tipBox = document.getElementById('tipBox');
     if(!locName){ tipBox.classList.add('hidden'); return; }
     var info = locationInfo(locName);
+    if(!info.tip){ tipBox.classList.add('hidden'); return; }
     tipBox.textContent = '💡 ' + info.tip;
     tipBox.style.borderLeftColor = info.color;
     tipBox.classList.remove('hidden');
@@ -432,9 +461,19 @@
   function findConflict(list, date, location, start, end, excludeId){
     var s = timeToMinutes(start), e = timeToMinutes(end);
     return list.find(function(b){
-      return b.status==='approved' && b.date===date && b.location===location && b.id!==excludeId &&
-        timeToMinutes(b.start) < e && s < timeToMinutes(b.end);
+      if(b.status!=='approved' || b.date!==date || b.id===excludeId) return false;
+      var overlap = timeToMinutes(b.start) < e && s < timeToMinutes(b.end);
+      if(!overlap) return false;
+      if(b.type==='block') return true;
+      return b.location===location;
     });
+  }
+ 
+  function conflictMessage(conflict, location){
+    if(conflict.type==='block'){
+      return 'David 這個時段無法安排會議（' + conflict.subject + '），請更換時間。';
+    }
+    return '此時段「' + location + '」已被《' + conflict.subject + '》（' + conflict.applicant + '，' + conflict.start + '–' + conflict.end + '）預約，請更換時間或地點。';
   }
  
   function checkConflict(){
@@ -452,7 +491,7 @@
     var s = timeToMinutes(start), e = timeToMinutes(end);
     var conflict = findConflict(bookings, date, loc, start, end, null);
     if(conflict){
-      warnBox.textContent = '⚠ 此時段「' + loc + '」已被《' + conflict.subject + '》（' + conflict.applicant + '，' + conflict.start + '–' + conflict.end + '）預約，請更換時間或地點';
+      warnBox.textContent = '⚠ ' + conflictMessage(conflict, loc);
       warnBox.classList.remove('hidden');
     } else {
       warnBox.classList.add('hidden');
@@ -498,8 +537,7 @@
       bookings = fresh;
       var conflict = findConflict(fresh, date, location, start, end, null);
       if(conflict){
-        document.getElementById('conflictModalMsg').textContent =
-          '此時段「' + location + '」已被《' + conflict.subject + '》（' + conflict.applicant + '，' + conflict.start + '–' + conflict.end + '）預約，請更換時間或地點後再送出。';
+        document.getElementById('conflictModalMsg').textContent = conflictMessage(conflict, location);
         document.getElementById('conflictModal').classList.remove('hidden');
         checkConflict();
         return null;
@@ -570,15 +608,31 @@
     }
     grid.style.height = ((DAY_END-DAY_START+1) * HOUR_HEIGHT) + 'px';
  
-    var dayEvents = bookings.filter(function(b){ return b.status==='approved' && b.date===currentViewDate; })
+    var allDayEvents = bookings.filter(function(b){ return b.status==='approved' && b.date===currentViewDate; });
+    var blockEvents = allDayEvents.filter(function(b){ return b.type==='block'; });
+    var dayEvents = allDayEvents.filter(function(b){ return b.type!=='block'; })
       .sort(function(a,b){ return timeToMinutes(a.start) - timeToMinutes(b.start); });
  
-    if(dayEvents.length===0){
+    if(allDayEvents.length===0){
       var empty = document.createElement('div');
       empty.className = 'timeline-empty-overlay';
       empty.textContent = '這天目前沒有已核准的會議';
       grid.appendChild(empty);
     }
+ 
+    blockEvents.forEach(function(ev){
+      var bStartMin = timeToMinutes(ev.start) - DAY_START*60;
+      var bEndMin = timeToMinutes(ev.end) - DAY_START*60;
+      var bTop = (bStartMin/60) * HOUR_HEIGHT;
+      var bHeight = Math.max(((bEndMin-bStartMin)/60) * HOUR_HEIGHT, 30);
+      var band = document.createElement('div');
+      band.className = 'block-band';
+      band.style.top = bTop + 'px';
+      band.style.height = bHeight + 'px';
+      band.title = ev.start+'–'+ev.end+' '+ev.subject;
+      band.innerHTML = '<span class="block-label">🚫 '+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'　'+escapeHtml(ev.subject)+'</span>';
+      grid.appendChild(band);
+    });
  
     var cols = [];
     dayEvents.forEach(function(ev){
@@ -672,12 +726,21 @@
     list.innerHTML = '';
  
     ['pending','approved','rejected'].forEach(function(s){
-      var c = bookings.filter(function(b){ return b.status===s; }).length;
+      var c = bookings.filter(function(b){ return b.status===s && b.type!=='block'; }).length;
       var el = document.getElementById('count-'+s);
       if(el) el.textContent = c;
     });
+    var blockCountEl = document.getElementById('count-blocked');
+    if(blockCountEl) blockCountEl.textContent = bookings.filter(function(b){ return b.type==='block'; }).length;
  
-    var filtered = bookings.filter(function(b){ return b.status===adminTab; })
+    document.getElementById('blockFormCard').classList.toggle('hidden', adminTab !== 'blocked');
+ 
+    if(adminTab === 'blocked'){
+      renderBlockedList(list);
+      return;
+    }
+ 
+    var filtered = bookings.filter(function(b){ return b.status===adminTab && b.type!=='block'; })
       .sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); });
  
     if(filtered.length===0){
@@ -703,6 +766,31 @@
           '<div class="applied-at">申請時間：'+formatDateTime(b.createdAt)+'</div>' +
         '</div>' +
         '<div class="row-actions" data-id="'+b.id+'">' + actionsHtml + '</div>';
+      list.appendChild(row);
+    });
+  }
+ 
+  function renderBlockedList(list){
+    var blocks = bookings.filter(function(b){ return b.type==='block'; })
+      .sort(function(a,b){
+        if(a.date !== b.date) return a.date < b.date ? -1 : 1;
+        return timeToMinutes(a.start) - timeToMinutes(b.start);
+      });
+ 
+    if(blocks.length===0){
+      list.innerHTML = '<div class="empty-list">目前沒有封鎖時段，可在上方新增</div>';
+      return;
+    }
+ 
+    blocks.forEach(function(b){
+      var row = document.createElement('div');
+      row.className = 'booking-row';
+      row.innerHTML =
+        '<div class="info">' +
+          '<div class="top-line">'+escapeHtml(b.date)+' · '+escapeHtml(b.start)+'–'+escapeHtml(b.end)+'</div>' +
+          '<div class="subject">🚫 '+escapeHtml(b.subject)+'</div>' +
+        '</div>' +
+        '<div class="row-actions" data-id="'+b.id+'"><button class="action-btn delete" data-action="delete">刪除</button></div>';
       list.appendChild(row);
     });
   }
@@ -740,6 +828,46 @@
     });
   }
  
+  function handleAddBlock(){
+    var date = document.getElementById('blockDateInput').value;
+    var start = document.getElementById('blockStartInput').value;
+    var end = document.getElementById('blockEndInput').value;
+    var reason = document.getElementById('blockReasonInput').value.trim();
+    var msg = document.getElementById('blockFormMsg');
+ 
+    ['blockDateInput','blockStartInput','blockEndInput'].forEach(function(id){
+      document.getElementById(id).classList.remove('field-error');
+    });
+ 
+    var errors = [];
+    if(!date) errors.push('blockDateInput');
+    if(!start) errors.push('blockStartInput');
+    if(!end) errors.push('blockEndInput');
+    if(start && end && timeToMinutes(end) <= timeToMinutes(start) && errors.indexOf('blockEndInput')===-1) errors.push('blockEndInput');
+ 
+    if(errors.length){
+      errors.forEach(function(id){ document.getElementById(id).classList.add('field-error'); });
+      msg.textContent = '請填寫日期與時間，並確認結束時間晚於開始時間';
+      msg.classList.remove('hidden');
+      return;
+    }
+    msg.classList.add('hidden');
+ 
+    insertBooking({
+      applicant: 'David', attendees: '', date: date,
+      location: '(不開放預約)', start: start, end: end,
+      subject: reason || 'David 目前無法安排會議',
+      status: 'approved', type: 'block'
+    }).then(function(){
+      document.getElementById('blockReasonInput').value = '';
+      return refreshData();
+    }).catch(function(err){
+      console.error('新增封鎖時段失敗', err);
+      msg.textContent = '新增失敗，請確認網路連線後再試一次';
+      msg.classList.remove('hidden');
+    });
+  }
+ 
   // ---------- refresh ----------
   function refreshData(){
     return loadBookings().then(function(fresh){
@@ -756,6 +884,8 @@
     document.getElementById('dateInput').value = todayStr();
     document.getElementById('dateInput').min = todayStr();
     document.getElementById('jumpDate').value = currentViewDate;
+    document.getElementById('blockDateInput').value = todayStr();
+    document.getElementById('blockDateInput').min = todayStr();
  
     document.getElementById('locationSelect').addEventListener('change', function(){ updateTip(); checkConflict(); });
     document.getElementById('dateInput').addEventListener('change', checkConflict);
@@ -807,6 +937,7 @@
       });
     });
     document.getElementById('adminList').addEventListener('click', handleAdminListClick);
+    document.getElementById('addBlockBtn').addEventListener('click', handleAddBlock);
  
     loadBookings().then(function(fresh){
       bookings = fresh;
@@ -825,4 +956,3 @@
 </script>
 </body>
 </html>
- 
