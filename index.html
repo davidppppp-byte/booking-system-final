@@ -93,6 +93,35 @@
   .block-band{position:absolute;left:4px;right:4px;border-radius:8px;background:repeating-linear-gradient(135deg, rgba(43,36,32,.88), rgba(43,36,32,.88) 10px, rgba(43,36,32,.74) 10px, rgba(43,36,32,.74) 20px);display:flex;align-items:center;padding:0 12px;overflow:hidden;z-index:1;}
   .block-label{color:#fff;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .now-line{position:absolute;left:0;right:0;border-top:2px solid #D9534F;z-index:5;}
+ 
+  /* ── 常用時長快速鍵 ── */
+  .duration-chips{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;margin-top:-6px;}
+  .dur-chip{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:#fff;font-size:13px;color:var(--ink-soft);font-weight:600;}
+  .dur-chip:hover{border-color:var(--accent);color:var(--accent-dark);}
+  .dur-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+ 
+  /* ── 週檢視 ── */
+  .view-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-left:auto;}
+  .vtog-btn{padding:6px 14px;background:#fff;border:none;font-size:13px;font-weight:600;color:var(--ink-soft);}
+  .vtog-btn.active{background:var(--ink);color:#fff;}
+  .week-grid{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;}
+  .week-col{border-right:1px solid var(--border);min-height:320px;}
+  .week-col:last-child{border-right:none;}
+  .week-col-head{padding:10px 6px 8px;text-align:center;border-bottom:1px solid var(--border);background:#FAFAF8;}
+  .week-col-head.today{background:var(--ink);}
+  .week-col-head.today .wch-dow,.week-col-head.today .wch-date{color:#fff;}
+  .wch-dow{font-size:10.5px;color:var(--ink-soft);font-family:var(--mono);}
+  .wch-date{font-size:15px;font-weight:700;margin-top:2px;font-family:var(--mono);color:var(--ink);}
+  .week-events{padding:6px 4px;display:flex;flex-direction:column;gap:4px;}
+  .week-chip{border-radius:6px;padding:4px 6px;color:#fff;font-size:11px;line-height:1.3;cursor:default;}
+  .week-chip .wct{font-family:var(--mono);font-size:10px;opacity:.9;}
+  .week-chip .wcs{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .week-chip.block-chip{background:repeating-linear-gradient(135deg,rgba(43,36,32,.82),rgba(43,36,32,.82) 6px,rgba(43,36,32,.65) 6px,rgba(43,36,32,.65) 12px);}
+  .week-empty{padding:12px 4px;text-align:center;font-size:11.5px;color:var(--ink-faint);}
+ 
+  /* ── 查詢取消按鈕 ── */
+  .cancel-booking-btn{padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--danger);font-size:12.5px;font-weight:700;white-space:nowrap;}
+  .cancel-booking-btn:hover{background:var(--danger-bg);border-color:var(--danger);}
   .now-dot{position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#D9534F;}
   .now-label{position:absolute;left:8px;top:-17px;font-size:10.5px;color:#D9534F;font-weight:700;font-family:var(--mono);background:#fff;padding:0 4px;border-radius:4px;}
  
@@ -199,6 +228,14 @@
  
           <div id="conflictWarning" class="conflict-box hidden"></div>
  
+          <div class="duration-chips">
+            <span style="font-size:13px;color:var(--ink-soft);font-weight:600;align-self:center;">快速時長：</span>
+            <button type="button" class="dur-chip" data-min="30">30 分</button>
+            <button type="button" class="dur-chip" data-min="60">1 小時</button>
+            <button type="button" class="dur-chip" data-min="90">1.5 小時</button>
+            <button type="button" class="dur-chip" data-min="120">2 小時</button>
+          </div>
+ 
           <div class="field full">
             <label for="subjectInput">會議內容 (Subject)<span class="req">*</span></label>
             <input type="text" id="subjectInput" placeholder="必填">
@@ -236,15 +273,25 @@
       <button type="button" class="nav-btn" id="todayBtn">回到今天</button>
       <button type="button" class="nav-btn" id="mainRefreshBtn" title="重新整理資料">⟳ 重新整理</button>
       <input type="date" id="jumpDate" class="jump-date">
+      <div class="view-toggle">
+        <button type="button" class="vtog-btn active" id="viewDayBtn">日</button>
+        <button type="button" class="vtog-btn" id="viewWeekBtn">週</button>
+      </div>
     </div>
  
     <div class="day-strip" id="dayStrip"></div>
  
-    <div class="timeline-card">
-      <div class="timeline-wrap">
-        <div class="timeline-hours" id="timelineHours"></div>
-        <div class="timeline-grid" id="timelineGrid"></div>
+    <div id="dayView">
+      <div class="timeline-card">
+        <div class="timeline-wrap">
+          <div class="timeline-hours" id="timelineHours"></div>
+          <div class="timeline-grid" id="timelineGrid"></div>
+        </div>
       </div>
+    </div>
+ 
+    <div id="weekView" class="hidden">
+      <div class="week-grid" id="weekGrid"></div>
     </div>
  
     <footer class="bottom">
@@ -269,6 +316,43 @@
       <button type="button" class="tab-btn" data-tab="approved">已通過 <span class="count" id="count-approved">0</span></button>
       <button type="button" class="tab-btn" data-tab="rejected">已拒絕 <span class="count" id="count-rejected">0</span></button>
       <button type="button" class="tab-btn" data-tab="blocked">封鎖時段 <span class="count" id="count-blocked">0</span></button>
+      <button type="button" class="tab-btn" data-tab="admin-add">＋ 手動新增</button>
+    </div>
+ 
+    <div id="adminAddFormCard" class="card hidden" style="margin-bottom:18px;">
+      <p style="margin:0 0 14px;font-size:13.5px;color:var(--ink-soft);">直接幫同仁建立一筆「已通過」的會議，適合口頭或 LINE 口頭約定的情況。</p>
+      <div class="form-grid">
+        <div class="field">
+          <label for="adminAddApplicant">預約人<span class="req">*</span></label>
+          <input type="text" id="adminAddApplicant" placeholder="必填">
+        </div>
+        <div class="field">
+          <label for="adminAddAttendees">與會人<span class="opt">選填</span></label>
+          <input type="text" id="adminAddAttendees" placeholder="選填">
+        </div>
+        <div class="field">
+          <label for="adminAddDate">日期<span class="req">*</span></label>
+          <input type="date" id="adminAddDate">
+        </div>
+        <div class="field">
+          <label for="adminAddLocation">地點<span class="req">*</span></label>
+          <select id="adminAddLocation"><option value="" disabled selected>必填</option></select>
+        </div>
+        <div class="field">
+          <label for="adminAddStart">開始<span class="req">*</span></label>
+          <input type="time" id="adminAddStart" value="09:00">
+        </div>
+        <div class="field">
+          <label for="adminAddEnd">結束<span class="req">*</span></label>
+          <input type="time" id="adminAddEnd" value="10:00">
+        </div>
+        <div class="field full">
+          <label for="adminAddSubject">會議內容<span class="req">*</span></label>
+          <input type="text" id="adminAddSubject" placeholder="必填">
+        </div>
+        <div id="adminAddMsg" class="form-msg hidden"></div>
+        <button type="button" class="submit-btn" id="adminAddSubmitBtn" style="background:var(--success);">新增（直接通過）</button>
+      </div>
     </div>
  
     <div id="blockFormCard" class="card hidden" style="margin-bottom:18px;">
@@ -372,6 +456,7 @@
  
   var bookings = [];
   var currentViewDate = todayStr();
+  var calendarView = 'day'; // 'day' | 'week'
   var isAdmin = false;
   var adminTab = 'pending';
  
@@ -398,7 +483,15 @@
     var d=new Date(iso);
     return (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes());
   }
-  function tabLabel(t){ return t==='pending'?'待審核':t==='approved'?'已通過':t==='blocked'?'封鎖時段':'已拒絕'; }
+  function tabLabel(t){ return t==='pending'?'待審核':t==='approved'?'已通過':t==='blocked'?'封鎖時段':t==='admin-add'?'手動新增':'已拒絕'; }
+  function minutesToTime(m){ return pad(Math.floor(m/60))+':'+pad(m%60); }
+  function weekStartOf(dateStr){
+    var d=new Date(dateStr+'T00:00:00');
+    var dow=d.getDay(); // 0=Sun
+    var diff = (dow===0)?-6:1-dow; // shift to Monday
+    d.setDate(d.getDate()+diff);
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }
  
   // ---------- supabase data layer ----------
   function rowToBooking(row){
@@ -463,6 +556,18 @@
       if(res.error) throw res.error;
       return true;
     });
+  }
+ 
+  // ---------- duration chips ----------
+  function handleDurationChip(minutes){
+    var startVal = document.getElementById('startInput').value;
+    if(!startVal) return;
+    var endMin = timeToMinutes(startVal) + minutes;
+    if(endMin > DAY_END*60) endMin = DAY_END*60;
+    document.getElementById('endInput').value = minutesToTime(endMin);
+    document.querySelectorAll('.dur-chip').forEach(function(c){ c.classList.remove('active'); });
+    document.querySelector('.dur-chip[data-min="'+minutes+'"]').classList.add('active');
+    checkConflict();
   }
  
   // ---------- form ----------
@@ -618,19 +723,50 @@
       }
       box.innerHTML = mine.map(function(b){
         var note = b.status==='rejected' ? '<div class="rejected-note">已婉拒，如有疑問請洽 David</div>' : '';
+        var cancelBtn = b.status==='pending'
+          ? '<button class="cancel-booking-btn" data-cancel-id="'+escapeHtml(b.id)+'">取消預約</button>'
+          : '';
         return '<div class="booking-row">' +
           '<div class="info">' +
             '<div class="top-line">'+escapeHtml(b.date)+' · '+escapeHtml(b.start)+'–'+escapeHtml(b.end)+' · '+escapeHtml(b.location)+'</div>' +
             '<div class="subject">'+escapeHtml(b.subject)+'</div>' +
             note +
           '</div>' +
-          '<div><span class="status-badge '+statusLookupClass(b.status)+'">'+statusLookupLabel(b.status)+'</span></div>' +
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+            '<span class="status-badge '+statusLookupClass(b.status)+'">'+statusLookupLabel(b.status)+'</span>' +
+            cancelBtn +
+          '</div>' +
         '</div>';
       }).join('');
+ 
+      box.addEventListener('click', function(e){
+        var btn = e.target.closest('.cancel-booking-btn');
+        if(!btn) return;
+        if(!confirm('確定要取消這筆預約嗎？')) return;
+        var id = btn.dataset.cancelId;
+        deleteBookingRow(id).then(function(){
+          return refreshData();
+        }).then(function(){
+          handleLookup();
+        }).catch(function(err){
+          console.error('取消失敗', err);
+          alert('取消失敗，請確認網路連線後再試一次');
+        });
+      }, {once: true});
     }).catch(function(err){
       console.error('查詢失敗', err);
       box.innerHTML = '<div class="empty-list">查詢失敗，請確認網路連線後再試一次</div>';
     });
+  }
+ 
+  function setCalendarView(view){
+    calendarView = view;
+    document.getElementById('dayView').classList.toggle('hidden', view!=='day');
+    document.getElementById('weekView').classList.toggle('hidden', view!=='week');
+    document.getElementById('viewDayBtn').classList.toggle('active', view==='day');
+    document.getElementById('viewWeekBtn').classList.toggle('active', view==='week');
+    document.getElementById('dayStrip').classList.toggle('hidden', view==='week');
+    renderTimeline();
   }
  
   // ---------- calendar / timeline ----------
@@ -660,6 +796,60 @@
   }
  
   function renderTimeline(){
+    if(calendarView === 'week'){ renderWeekView(); return; }
+    renderDayView();
+  }
+ 
+  function renderWeekView(){
+    var wStart = weekStartOf(currentViewDate);
+    var today = todayStr();
+    var week = ['週一','週二','週三','週四','週五','週六','週日'];
+    var grid = document.getElementById('weekGrid');
+    grid.innerHTML = '';
+    document.getElementById('timelineDateLabel').textContent = (function(){
+      var ws = new Date(wStart+'T00:00:00');
+      var we = new Date(wStart+'T00:00:00'); we.setDate(we.getDate()+6);
+      return ws.getFullYear()+'年'+(ws.getMonth()+1)+'月'+ws.getDate()+'日 – '+(we.getMonth()+1)+'月'+we.getDate()+'日';
+    })();
+ 
+    for(var i=0;i<7;i++){
+      var dateStr = addDays(wStart, i);
+      var dayEvents = bookings.filter(function(b){ return b.status==='approved' && b.date===dateStr; })
+        .sort(function(a,b){ return timeToMinutes(a.start)-timeToMinutes(b.start); });
+ 
+      var col = document.createElement('div');
+      col.className = 'week-col';
+ 
+      var head = document.createElement('div');
+      head.className = 'week-col-head' + (dateStr===today?' today':'');
+      head.innerHTML = '<div class="wch-dow">'+week[i]+'</div>' +
+        '<div class="wch-date">'+(function(d){ return (d.getMonth()+1)+'/'+d.getDate(); })(new Date(dateStr+'T00:00:00'))+'</div>';
+      col.appendChild(head);
+ 
+      var evBox = document.createElement('div');
+      evBox.className = 'week-events';
+ 
+      if(dayEvents.length===0){
+        var emp = document.createElement('div');
+        emp.className = 'week-empty'; emp.textContent = '空';
+        evBox.appendChild(emp);
+      } else {
+        dayEvents.forEach(function(ev){
+          var chip = document.createElement('div');
+          chip.className = 'week-chip' + (ev.type==='block' ? ' block-chip' : '');
+          if(ev.type!=='block') chip.style.background = locationInfo(ev.location).color;
+          chip.title = ev.start+'–'+ev.end+' '+ev.subject+(ev.type!=='block'?' / '+ev.location+' / '+ev.applicant:'');
+          chip.innerHTML = '<div class="wct">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
+            '<div class="wcs">'+(ev.type==='block'?'🚫 ':'')+escapeHtml(ev.subject)+'</div>';
+          evBox.appendChild(chip);
+        });
+      }
+      col.appendChild(evBox);
+      grid.appendChild(col);
+    }
+  }
+ 
+  function renderDayView(){
     document.getElementById('timelineDateLabel').textContent = formatDisplayDate(currentViewDate);
     var hoursCol = document.getElementById('timelineHours');
     var grid = document.getElementById('timelineGrid');
@@ -812,11 +1002,10 @@
     if(blockCountEl) blockCountEl.textContent = bookings.filter(function(b){ return b.type==='block'; }).length;
  
     document.getElementById('blockFormCard').classList.toggle('hidden', adminTab !== 'blocked');
+    document.getElementById('adminAddFormCard').classList.toggle('hidden', adminTab !== 'admin-add');
  
-    if(adminTab === 'blocked'){
-      renderBlockedList(list);
-      return;
-    }
+    if(adminTab === 'blocked'){ renderBlockedList(list); return; }
+    if(adminTab === 'admin-add'){ list.innerHTML = ''; return; }
  
     var filtered = bookings.filter(function(b){ return b.status===adminTab && b.type!=='block'; })
       .sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); });
@@ -906,6 +1095,60 @@
     });
   }
  
+  function handleAdminAddBooking(){
+    var applicant = document.getElementById('adminAddApplicant').value.trim();
+    var attendees = document.getElementById('adminAddAttendees').value.trim();
+    var date = document.getElementById('adminAddDate').value;
+    var location = document.getElementById('adminAddLocation').value;
+    var start = document.getElementById('adminAddStart').value;
+    var end = document.getElementById('adminAddEnd').value;
+    var subject = document.getElementById('adminAddSubject').value.trim();
+    var msg = document.getElementById('adminAddMsg');
+ 
+    ['adminAddApplicant','adminAddDate','adminAddLocation','adminAddStart','adminAddEnd','adminAddSubject'].forEach(function(id){
+      document.getElementById(id).classList.remove('field-error');
+    });
+ 
+    var errors = [];
+    if(!applicant) errors.push('adminAddApplicant');
+    if(!date) errors.push('adminAddDate');
+    if(!location) errors.push('adminAddLocation');
+    if(!start) errors.push('adminAddStart');
+    if(!end) errors.push('adminAddEnd');
+    if(!subject) errors.push('adminAddSubject');
+    if(start && end && timeToMinutes(end) <= timeToMinutes(start) && errors.indexOf('adminAddEnd')===-1) errors.push('adminAddEnd');
+ 
+    if(errors.length){
+      errors.forEach(function(id){ document.getElementById(id).classList.add('field-error'); });
+      msg.textContent = '請完整填寫必填欄位，並確認結束時間晚於開始時間';
+      msg.classList.remove('hidden');
+      return;
+    }
+    msg.classList.add('hidden');
+ 
+    var conflict = findConflict(bookings, date, location, start, end, null);
+    if(conflict){
+      msg.textContent = '提醒：此時段有衝突（' + conflict.subject + '），仍可繼續新增，請確認是否繼續？';
+      msg.classList.remove('hidden');
+    }
+ 
+    insertBooking({
+      applicant: applicant, attendees: attendees, date: date,
+      location: location, start: start, end: end, subject: subject,
+      status: 'approved', type: 'meeting'
+    }).then(function(){
+      ['adminAddApplicant','adminAddAttendees','adminAddSubject'].forEach(function(id){
+        document.getElementById(id).value='';
+      });
+      msg.classList.add('hidden');
+      return refreshData();
+    }).catch(function(err){
+      console.error('手動新增失敗', err);
+      msg.textContent = '新增失敗，請確認網路連線後再試一次';
+      msg.classList.remove('hidden');
+    });
+  }
+ 
   function handleAddBlock(){
     var date = document.getElementById('blockDateInput').value;
     var start = document.getElementById('blockStartInput').value;
@@ -964,6 +1207,26 @@
     document.getElementById('jumpDate').value = currentViewDate;
     document.getElementById('blockDateInput').value = todayStr();
     document.getElementById('blockDateInput').min = todayStr();
+    document.getElementById('adminAddDate').value = todayStr();
+    document.getElementById('adminAddDate').min = todayStr();
+ 
+    // populate admin-add location select
+    LOCATIONS.forEach(function(loc){
+      var opt = document.createElement('option');
+      opt.value = loc.name; opt.textContent = loc.name;
+      document.getElementById('adminAddLocation').appendChild(opt);
+    });
+ 
+    // duration chips
+    document.querySelectorAll('.dur-chip').forEach(function(chip){
+      chip.addEventListener('click', function(){
+        handleDurationChip(parseInt(chip.dataset.min, 10));
+      });
+    });
+    // clear active chip when start time changes manually
+    document.getElementById('startInput').addEventListener('change', function(){
+      document.querySelectorAll('.dur-chip').forEach(function(c){ c.classList.remove('active'); });
+    });
  
     document.getElementById('locationSelect').addEventListener('change', function(){ updateTip(); checkConflict(); });
     document.getElementById('dateInput').addEventListener('change', checkConflict);
@@ -998,6 +1261,8 @@
       renderDayStrip(); renderTimeline();
     });
     document.getElementById('mainRefreshBtn').addEventListener('click', refreshData);
+    document.getElementById('viewDayBtn').addEventListener('click', function(){ setCalendarView('day'); });
+    document.getElementById('viewWeekBtn').addEventListener('click', function(){ setCalendarView('week'); });
     document.getElementById('lookupBtn').addEventListener('click', handleLookup);
     document.getElementById('lookupNameInput').addEventListener('keydown', function(e){
       if(e.key === 'Enter'){ e.preventDefault(); handleLookup(); }
@@ -1020,6 +1285,7 @@
     });
     document.getElementById('adminList').addEventListener('click', handleAdminListClick);
     document.getElementById('addBlockBtn').addEventListener('click', handleAddBlock);
+    document.getElementById('adminAddSubmitBtn').addEventListener('click', handleAdminAddBooking);
  
     loadBookings().then(function(fresh){
       bookings = fresh;
