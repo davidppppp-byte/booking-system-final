@@ -413,6 +413,7 @@
   </div>
 </div>
  
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
@@ -452,6 +453,14 @@
     }catch(e){
       console.error('Supabase 初始化失敗', e);
     }
+  }
+ 
+  var EMAILJS_SERVICE_ID  = 'service_il9ifv9';
+  var EMAILJS_TEMPLATE_ID = 'template_ehcsam3';
+  var EMAILJS_PUBLIC_KEY  = 'zwcWSKjIB4gx4Fpnp';
+ 
+  if(window.emailjs){
+    window.emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
   }
  
   var bookings = [];
@@ -555,6 +564,22 @@
     return supabaseClient.from(TABLE_NAME).delete().eq('id', id).then(function(res){
       if(res.error) throw res.error;
       return true;
+    });
+  }
+ 
+  // ---------- email notification ----------
+  function sendNotificationEmail(b){
+    if(!window.emailjs) return;
+    window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      applicant: b.applicant,
+      date:      b.date,
+      start:     b.start,
+      end:       b.end,
+      location:  b.location,
+      subject:   b.subject,
+      attendees: b.attendees || '（無）'
+    }).catch(function(err){
+      console.warn('Email 通知發送失敗（不影響預約流程）', err);
     });
   }
  
@@ -681,6 +706,10 @@
       });
     }).then(function(result){
       if(result === null) return;
+      sendNotificationEmail({
+        applicant: applicant, attendees: attendees, date: date,
+        location: location, start: start, end: end, subject: subject
+      });
       document.getElementById('lookupNameInput').value = applicant;
       document.getElementById('bookingForm').reset();
       document.getElementById('dateInput').value = todayStr();
