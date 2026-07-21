@@ -293,13 +293,14 @@
           <select id="roomDepartment">
             <option value="" disabled selected>請選擇部門</option>
             <option>營運長室</option>
+            <option>職安室</option>
             <option>財務部</option>
-            <option>會計部</option>
-            <option>業務部</option>
-            <option>生產部</option>
-            <option>倉儲部</option>
-            <option>行政部</option>
-            <option>其他</option>
+            <option>採購部</option>
+            <option>人力資源部</option>
+            <option>行政管理部</option>
+            <option>行銷部</option>
+            <option>客服部</option>
+            <option>商務拓展部</option>
           </select>
         </div>
         <div class="field">
@@ -993,17 +994,36 @@
       }
       box.innerHTML = mine.map(function(b){
         var note = b.status==='rejected' ? '<div class="rejected-note">已婉拒，如有疑問請洽 David</div>' : '';
-        var cancelBtn = b.status==='pending'
-          ? '<button class="cancel-booking-btn" data-cancel-id="'+escapeHtml(b.id)+'">取消預約</button>'
+
+        // 可取消條件：David 預約且待審核，或會議室預約且尚未開始
+        var canCancel = false;
+        var cancelLabel = '取消預約';
+        if(b.bookingMode === 'david' && b.status === 'pending'){
+          canCancel = true;
+        } else if(b.bookingMode === 'room'){
+          // 若會議日期時間還沒到，可以取消
+          var meetingStart = new Date(b.date + 'T' + b.start + ':00');
+          if(meetingStart > new Date()){
+            canCancel = true;
+            cancelLabel = '取消會議室';
+          }
+        }
+
+        var modeTag = b.bookingMode === 'room'
+          ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:#EAF0EE;color:#3E6E66;font-size:11px;font-weight:700;margin-left:6px;">🏢 會議室</span>'
           : '';
+        var cancelBtn = canCancel
+          ? '<button class="cancel-booking-btn" data-cancel-id="'+escapeHtml(b.id)+'" data-cancel-mode="'+escapeHtml(b.bookingMode)+'">'+cancelLabel+'</button>'
+          : '';
+
         return '<div class="booking-row">' +
           '<div class="info">' +
-            '<div class="top-line">'+escapeHtml(b.date)+' · '+escapeHtml(b.start)+'–'+escapeHtml(b.end)+' · '+escapeHtml(b.location)+'</div>' +
+            '<div class="top-line">'+escapeHtml(b.date)+' · '+escapeHtml(b.start)+'–'+escapeHtml(b.end)+' · '+escapeHtml(b.location)+modeTag+'</div>' +
             '<div class="subject">'+escapeHtml(b.subject)+'</div>' +
             note +
           '</div>' +
           '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
-            '<span class="status-badge '+statusLookupClass(b.status)+'">'+statusLookupLabel(b.status)+'</span>' +
+            (b.bookingMode==='david' ? '<span class="status-badge '+statusLookupClass(b.status)+'">'+statusLookupLabel(b.status)+'</span>' : '<span class="status-badge approved">已登記</span>') +
             cancelBtn +
           '</div>' +
         '</div>';
@@ -1012,7 +1032,11 @@
       box.addEventListener('click', function(e){
         var btn = e.target.closest('.cancel-booking-btn');
         if(!btn) return;
-        if(!confirm('確定要取消這筆預約嗎？')) return;
+        var mode = btn.dataset.cancelMode;
+        var confirmMsg = mode === 'room'
+          ? '確定要取消這筆會議室預約嗎？取消後該時段將立即釋出。'
+          : '確定要取消這筆預約申請嗎？';
+        if(!confirm(confirmMsg)) return;
         var id = btn.dataset.cancelId;
         deleteBookingRow(id).then(function(){
           return refreshData();
