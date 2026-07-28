@@ -189,6 +189,11 @@
   .cancel-booking-btn:hover{background:var(--danger-bg);border-color:var(--danger);}
   .now-dot{position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#D9534F;}
   .now-label{position:absolute;left:8px;top:-17px;font-size:10.5px;color:#D9534F;font-weight:700;font-family:var(--mono);background:#fff;padding:0 4px;border-radius:4px;}
+  /* ── 快速登記 banner ── */
+  .quickbook-banner{background:linear-gradient(135deg,#2B5C4B,#3E7A67);color:#fff;border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;}
+  .quickbook-banner .qb-icon{font-size:28px;flex-shrink:0;}
+  .quickbook-banner .qb-title{font-size:15px;font-weight:700;}
+  .quickbook-banner .qb-sub{font-size:12.5px;opacity:.85;margin-top:2px;}
 
   footer.bottom{text-align:center;padding:36px 0 10px;font-size:12.5px;color:var(--ink-faint);}
   .admin-link{color:var(--ink-soft);text-decoration:underline;background:none;border:none;font-size:12.5px;padding:0;}
@@ -256,6 +261,14 @@
     </header>
 
     <div id="storageWarning" class="storage-warning hidden">⚠️ 尚未連接資料庫（Supabase），目前資料只會暫存在這個畫面中，重新整理後會消失、也不會與其他人同步。</div>
+
+    <div id="quickbookBanner" class="quickbook-banner hidden">
+      <div class="qb-icon">⚡</div>
+      <div>
+        <div class="qb-title" id="quickbookBannerTitle">快速登記</div>
+        <div class="qb-sub">已自動帶入會議室與時間，確認後直接送出即可</div>
+      </div>
+    </div>
 
     <!-- 模式切換 -->
     <div class="mode-switcher">
@@ -806,6 +819,45 @@
       if(res.error) throw res.error;
       return true;
     });
+  }
+
+  // ---------- quick book (URL params) ----------
+  function handleQuickBook(){
+    var params = new URLSearchParams(window.location.search);
+    var room = params.get('room');
+    if(!room) return;
+
+    // Switch to room mode
+    setCurrentMode('room');
+
+    // Pre-select the room
+    var roomSel = document.getElementById('roomLocation');
+    for(var i=0; i<roomSel.options.length; i++){
+      if(roomSel.options[i].value === room){ roomSel.selectedIndex = i; break; }
+    }
+
+    // Pre-fill today and round time to next 15-min boundary
+    var now = new Date();
+    var mins = now.getHours()*60 + now.getMinutes();
+    var rounded = Math.ceil(mins/15)*15;
+    if(rounded >= DAY_END*60) rounded = DAY_START*60;
+    var endMins = Math.min(rounded+60, DAY_END*60);
+    document.getElementById('roomDate').value = todayStr();
+    document.getElementById('roomStart').value = minutesToTime(rounded);
+    document.getElementById('roomEnd').value = minutesToTime(endMins);
+
+    // Show banner
+    document.getElementById('quickbookBannerTitle').textContent = '⚡ 快速登記：' + room;
+    document.getElementById('quickbookBanner').classList.remove('hidden');
+
+    // Trigger slot suggestions and conflict check
+    renderSlotSuggestions(todayStr(), room, 'room');
+    checkRoomConflict();
+
+    // Scroll form into view smoothly
+    setTimeout(function(){
+      document.getElementById('roomFormCard').scrollIntoView({behavior:'smooth', block:'start'});
+    }, 300);
   }
 
   // ---------- mode switcher ----------
@@ -2006,6 +2058,7 @@
       bookings = fresh;
       renderDayStrip();
       renderTimeline();
+      handleQuickBook();
       setInterval(refreshData, 20000);
     });
   }
