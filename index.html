@@ -144,6 +144,23 @@
 
   /* ── 會議室預約的行事曆色塊 ── */
   .event-block.room-booking{opacity:.88;}
+  .event-block{cursor:pointer;}
+  .week-chip{cursor:pointer !important;}
+
+  /* ── 色塊點擊細節彈窗 ── */
+  .event-popup-overlay{position:fixed;inset:0;z-index:60;background:transparent;}
+  .event-popup{position:fixed;z-index:61;background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(43,36,32,.22);width:290px;overflow:hidden;}
+  .event-popup-header{padding:14px 16px 10px;color:#fff;position:relative;}
+  .event-popup-header .ep-time{font-family:var(--mono);font-size:11.5px;opacity:.88;margin-bottom:3px;}
+  .event-popup-header .ep-subject{font-size:15.5px;font-weight:700;line-height:1.3;padding-right:28px;}
+  .event-popup-body{padding:8px 16px 14px;}
+  .ep-row{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);align-items:flex-start;}
+  .ep-row:last-child{border-bottom:none;}
+  .ep-icon{flex:0 0 18px;font-size:13px;margin-top:2px;}
+  .ep-content .ep-label{font-size:10.5px;color:var(--ink-soft);margin-bottom:1px;}
+  .ep-content .ep-val{font-size:13px;color:var(--ink);font-weight:600;}
+  .ep-close{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.25);border:none;color:#fff;width:24px;height:24px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+  .ep-close:hover{background:rgba(255,255,255,.4);}
 
   /* ── 後台會議室預約分頁 ── */
   .room-badge{display:inline-block;padding:3px 10px;border-radius:12px;background:#EAF0EE;color:#3E6E66;font-size:11.5px;font-weight:700;margin-left:6px;}
@@ -403,6 +420,17 @@
     <footer class="bottom">
       <p>蒙恩聽障烘焙坊・內部使用　·　<button type="button" class="admin-link" id="adminLinkBtn">管理者登入</button></p>
     </footer>
+  </div><!-- end mainView -->
+
+  <!-- 色塊細節彈窗 -->
+  <div id="eventPopupOverlay" class="event-popup-overlay hidden"></div>
+  <div id="eventPopup" class="event-popup hidden">
+    <div class="event-popup-header" id="eventPopupHeader">
+      <div class="ep-time" id="epTime"></div>
+      <div class="ep-subject" id="epSubject"></div>
+      <button type="button" class="ep-close" id="epClose">✕</button>
+    </div>
+    <div class="event-popup-body" id="eventPopupBody"></div>
   </div>
 </div>
 
@@ -1063,6 +1091,56 @@
     renderTimeline();
   }
 
+  // ---------- event popup ----------
+  function hideEventPopup(){
+    document.getElementById('eventPopup').classList.add('hidden');
+    document.getElementById('eventPopupOverlay').classList.add('hidden');
+  }
+
+  function showEventPopup(ev, clickX, clickY){
+    var header = document.getElementById('eventPopupHeader');
+    var color = ev.type==='block' ? '#2B2420' : ev.bookingMode==='room' ? ROOM_COLOR : locationInfo(ev.location).color;
+    header.style.background = color;
+
+    document.getElementById('epTime').textContent = ev.date + '　' + ev.start + ' – ' + ev.end;
+    document.getElementById('epSubject').textContent = (ev.type==='block'?'🚫 ':ev.bookingMode==='room'?'🏢 ':'') + ev.subject;
+
+    var rows = [];
+    rows.push({ icon:'📍', label:'地點', val: ev.location });
+    if(ev.bookingMode==='room'){
+      rows.push({ icon:'🏢', label:'部門', val: ev.department || '—' });
+      if(ev.attendeeCount) rows.push({ icon:'👥', label:'與會人數', val: ev.attendeeCount + ' 人' });
+      rows.push({ icon:'👤', label:'申請人', val: ev.applicant });
+      if(ev.notes) rows.push({ icon:'📝', label:'備註', val: ev.notes });
+    } else if(ev.type==='block'){
+      rows.push({ icon:'🚫', label:'說明', val: 'David 此時段無法安排會議' });
+    } else {
+      rows.push({ icon:'👤', label:'預約人', val: ev.applicant });
+      if(ev.attendees) rows.push({ icon:'👥', label:'與會人', val: ev.attendees });
+    }
+
+    var body = document.getElementById('eventPopupBody');
+    body.innerHTML = rows.map(function(r){
+      return '<div class="ep-row"><div class="ep-icon">'+r.icon+'</div><div class="ep-content"><div class="ep-label">'+escapeHtml(r.label)+'</div><div class="ep-val">'+escapeHtml(r.val)+'</div></div></div>';
+    }).join('');
+
+    var popup = document.getElementById('eventPopup');
+    popup.classList.remove('hidden');
+    document.getElementById('eventPopupOverlay').classList.remove('hidden');
+
+    // Position the popup smartly near the click point
+    var pw = 290, ph = popup.offsetHeight || 240;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var left = clickX + 12;
+    var top  = clickY - 40;
+    if(left + pw > vw - 12) left = clickX - pw - 12;
+    if(top + ph > vh - 12) top = vh - ph - 12;
+    if(top < 12) top = 12;
+    if(left < 12) left = 12;
+    popup.style.left = left + 'px';
+    popup.style.top  = top  + 'px';
+  }
+
   // ---------- calendar / timeline ----------
   function renderDayStrip(){
     var strip = document.getElementById('dayStrip');
@@ -1138,6 +1216,7 @@
           chip.innerHTML = '<div class="wct">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
             '<div class="wcs">'+(ev.type==='block'?'🚫 ':ev.bookingMode==='room'?'🏢 ':'')+escapeHtml(ev.subject)+'</div>';
           evBox.appendChild(chip);
+          (function(evData){ chip.addEventListener('click', function(e){ e.stopPropagation(); showEventPopup(evData, e.clientX, e.clientY); }); })(ev);
         });
       }
       col.appendChild(evBox);
@@ -1230,6 +1309,7 @@
         block.innerHTML = '<div class="ec">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'　'+prefix+escapeHtml(ev.subject)+'</div>';
       }
       grid.appendChild(block);
+      (function(evData){ block.addEventListener('click', function(e){ e.stopPropagation(); showEventPopup(evData, e.clientX, e.clientY); }); })(ev);
     });
 
     renderNowLine(grid);
@@ -1629,6 +1709,9 @@
     });
 
     document.getElementById('adminLinkBtn').addEventListener('click', openAdminPasswordModal);
+    document.getElementById('epClose').addEventListener('click', hideEventPopup);
+    document.getElementById('eventPopupOverlay').addEventListener('click', hideEventPopup);
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') hideEventPopup(); });
     document.getElementById('cancelAdminPasswordBtn').addEventListener('click', closeAdminPasswordModal);
     document.getElementById('submitAdminPasswordBtn').addEventListener('click', checkAdminPassword);
     document.getElementById('adminPasswordInput').addEventListener('keydown', function(e){
