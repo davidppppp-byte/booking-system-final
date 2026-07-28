@@ -119,7 +119,27 @@
   .week-chip.block-chip{background:repeating-linear-gradient(135deg,rgba(43,36,32,.82),rgba(43,36,32,.82) 6px,rgba(43,36,32,.65) 6px,rgba(43,36,32,.65) 12px);}
   .week-empty{padding:12px 4px;text-align:center;font-size:11.5px;color:var(--ink-faint);}
 
-  /* ── 查詢取消按鈕 ── */
+  /* ── 智慧空檔建議 ── */
+  .slot-suggestions{grid-column:1/-1;margin-top:-4px;}
+  .slot-suggestions-label{font-size:12px;color:var(--ink-soft);margin-bottom:6px;font-weight:600;}
+  .slot-chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .slot-chip{padding:5px 12px;border-radius:16px;border:1.5px solid var(--border);background:#fff;font-size:12.5px;font-family:var(--mono);color:var(--ink-soft);font-weight:600;}
+  .slot-chip:hover{border-color:var(--accent);color:var(--accent-dark);background:var(--amberLt,#FBF6EC);}
+  .slot-chip.room-chip:hover{border-color:#3E6E66;color:#2D5550;background:#EAF0EE;}
+  .slot-empty{font-size:12px;color:var(--ink-faint);font-style:italic;}
+  .next-slot-btn{margin-top:6px;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;border:1.5px solid var(--accent);background:#FBF6EC;color:var(--accent-dark);font-size:12.5px;font-weight:700;font-family:inherit;}
+  .next-slot-btn:hover{background:var(--accent);color:#fff;}
+  .next-slot-btn.room-next{border-color:#3E6E66;background:#EAF0EE;color:#2D5550;}
+  .next-slot-btn.room-next:hover{background:#3E6E66;color:#fff;}
+
+  /* ── 重複預約 ── */
+  .recur-toggle-row{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--grayLt,#F0EDEA);border-radius:10px;margin-top:4px;}
+  .recur-toggle-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+  .recur-toggle-row label{font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;}
+  .recur-options{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px;background:#FBF6EC;border-radius:10px;border:1.5px solid var(--border);}
+  .recur-options.room-recur{background:#EAF0EE;}
+  .recur-options .field label{color:var(--ink);}
+  .recur-preview{grid-column:1/-1;font-size:12px;color:var(--ink-soft);line-height:1.6;}
   /* ── 模式切換 ── */
   .mode-switcher{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;}
   .mode-btn{padding:16px 12px;border-radius:14px;border:2px solid var(--border);background:#fff;text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
@@ -271,6 +291,11 @@
             <label for="locationSelect">地點<span class="req">*</span></label>
             <select id="locationSelect"><option value="" disabled selected>必填</option></select>
           </div>
+
+          <div id="davidSlotSuggestions" class="slot-suggestions hidden">
+            <div class="slot-suggestions-label">📅 當天 David 空檔</div>
+            <div class="slot-chips" id="davidSlotChips"></div>
+          </div>
           <div id="tipBox" class="tip-box hidden"></div>
           <div class="field">
             <label for="startInput">開始<span class="req">*</span></label>
@@ -293,6 +318,33 @@
             <input type="text" id="subjectInput" placeholder="必填">
           </div>
           <div id="formMsg" class="form-msg hidden"></div>
+
+          <div class="recur-toggle-row">
+            <input type="checkbox" id="davidRecurCheck">
+            <label for="davidRecurCheck">🔁 設定重複預約</label>
+          </div>
+          <div id="davidRecurOptions" class="recur-options hidden">
+            <div class="field">
+              <label>重複頻率</label>
+              <select id="davidRecurFreq">
+                <option value="7">每週</option>
+                <option value="14">每兩週</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>共幾次（含第一次）</label>
+              <select id="davidRecurCount">
+                <option value="2">2 次</option>
+                <option value="3">3 次</option>
+                <option value="4">4 次</option>
+                <option value="5">5 次</option>
+                <option value="6">6 次</option>
+                <option value="8">8 次</option>
+              </select>
+            </div>
+            <div class="recur-preview" id="davidRecurPreview"></div>
+          </div>
+
           <button type="submit" class="submit-btn">送出申請（需審核）</button>
         </div>
       </form>
@@ -334,6 +386,11 @@
             <option>洽談室Ｂ</option>
           </select>
         </div>
+
+        <div id="roomSlotSuggestions" class="slot-suggestions hidden">
+          <div class="slot-suggestions-label">🏢 該會議室空閒時段</div>
+          <div class="slot-chips" id="roomSlotChips"></div>
+        </div>
         <div class="field">
           <label for="roomStart">開始時間<span class="req">*</span></label>
           <input type="time" id="roomStart" value="09:00">
@@ -363,6 +420,33 @@
           <input type="text" id="roomNotes" placeholder="例：有廠商來、面試用">
         </div>
         <div id="roomFormMsg" class="form-msg hidden"></div>
+
+        <div class="recur-toggle-row">
+          <input type="checkbox" id="roomRecurCheck">
+          <label for="roomRecurCheck">🔁 設定重複預約</label>
+        </div>
+        <div id="roomRecurOptions" class="recur-options room-recur hidden">
+          <div class="field">
+            <label>重複頻率</label>
+            <select id="roomRecurFreq">
+              <option value="7">每週</option>
+              <option value="14">每兩週</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>共幾次（含第一次）</label>
+            <select id="roomRecurCount">
+              <option value="2">2 次</option>
+              <option value="3">3 次</option>
+              <option value="4">4 次</option>
+              <option value="5">5 次</option>
+              <option value="6">6 次</option>
+              <option value="8">8 次</option>
+            </select>
+          </div>
+          <div class="recur-preview" id="roomRecurPreview"></div>
+        </div>
+
         <button type="button" class="room-submit-btn" id="roomSubmitBtn">登記會議室（立即生效）</button>
       </div>
     </div>
@@ -762,7 +846,18 @@
     }
     var conflict = findConflict(bookings, date, loc, start, end, null);
     if(conflict){
-      warnBox.textContent = '⚠ ' + conflictMessage(conflict, loc);
+      var rmsg = '⚠ ' + conflictMessage(conflict, loc);
+      var rNext = findNextAvailableSlot(date, loc, 'room', timeToMinutes(conflict.end));
+      warnBox.innerHTML = escapeHtml(rmsg) + (rNext
+        ? '<br><button type="button" class="next-slot-btn room-next" id="roomNextSlotBtn">→ 下一個空檔 '+escapeHtml(rNext.start)+'，點此帶入</button>'
+        : '');
+      if(rNext){
+        document.getElementById('roomNextSlotBtn').addEventListener('click', function(){
+          document.getElementById('roomStart').value = rNext.start;
+          document.getElementById('roomEnd').value = rNext.end;
+          checkRoomConflict();
+        });
+      }
       warnBox.classList.remove('hidden');
     } else {
       warnBox.classList.add('hidden');
@@ -814,18 +909,31 @@
         checkRoomConflict();
         return null;
       }
-      return insertBooking({
-        applicant: applicant, attendees: '', date: date, location: location,
-        start: start, end: end, subject: subject, status: 'approved',
-        type: 'meeting', bookingMode: 'room',
-        department: department, attendeeCount: parseInt(attendeeCount,10)||null, notes: notes
-      });
-    }).then(function(result){
-      if(result === null) return;
+      var isRecur = document.getElementById('roomRecurCheck').checked;
+      var recurDates = [date];
+      if(isRecur){
+        var freq  = parseInt(document.getElementById('roomRecurFreq').value, 10);
+        var count = parseInt(document.getElementById('roomRecurCount').value, 10);
+        for(var ri=1; ri<count; ri++) recurDates.push(addDays(date, ri*freq));
+      }
+      return Promise.all(recurDates.map(function(d){
+        return insertBooking({
+          applicant: applicant, attendees: '', date: d, location: location,
+          start: start, end: end, subject: subject, status: 'approved',
+          type: 'meeting', bookingMode: 'room',
+          department: department, attendeeCount: parseInt(attendeeCount,10)||null, notes: notes
+        });
+      }));
+    }).then(function(results){
+      if(results === null) return;
+      try{ localStorage.setItem('mongen_last_name', applicant); }catch(e){}
       ['roomApplicant','roomSubject','roomAttendeeCount','roomNotes'].forEach(function(id){ document.getElementById(id).value=''; });
       document.getElementById('roomDepartment').selectedIndex = 0;
       document.getElementById('roomLocation').selectedIndex = 0;
       document.getElementById('roomConflictWarning').classList.add('hidden');
+      document.getElementById('roomSlotSuggestions').classList.add('hidden');
+      document.getElementById('roomRecurCheck').checked = false;
+      document.getElementById('roomRecurOptions').classList.add('hidden');
       document.querySelectorAll('.room-dur-chip').forEach(function(c){ c.classList.remove('active'); });
       return refreshData().then(function(){
         document.getElementById('roomSuccessModal').classList.remove('hidden');
@@ -851,6 +959,110 @@
     }).catch(function(err){
       console.warn('Email 通知發送失敗（不影響預約流程）', err);
     });
+  }
+
+  // ---------- smart slot suggestions ----------
+  function getBlockedIntervals(date, location, mode){
+    var ivs = [];
+    bookings.forEach(function(b){
+      if(b.status !== 'approved' || b.date !== date) return;
+      var s = timeToMinutes(b.start), e = timeToMinutes(b.end);
+      if(b.type === 'block'){ ivs.push({s:s, e:e}); return; }
+      if(mode === 'david' && b.bookingMode === 'david'){ ivs.push({s:s, e:e}); return; }
+      if(mode === 'room' && b.location === location){ ivs.push({s:s, e:e}); }
+    });
+    ivs.sort(function(a,b){ return a.s - b.s; });
+    var merged = [];
+    ivs.forEach(function(iv){
+      if(!merged.length || iv.s >= merged[merged.length-1].e) merged.push({s:iv.s, e:iv.e});
+      else merged[merged.length-1].e = Math.max(merged[merged.length-1].e, iv.e);
+    });
+    return merged;
+  }
+
+  function findAvailableWindows(date, location, mode){
+    var blocked = getBlockedIntervals(date, location, mode);
+    var dayS = DAY_START*60, dayE = DAY_END*60;
+    var free = [], cursor = dayS;
+    blocked.forEach(function(iv){
+      var bs = Math.max(iv.s, dayS), be = Math.min(iv.e, dayE);
+      if(bs > cursor) free.push({s:cursor, e:bs});
+      cursor = Math.max(cursor, be);
+    });
+    if(cursor < dayE) free.push({s:cursor, e:dayE});
+    return free.filter(function(w){ return w.e - w.s >= 30; });
+  }
+
+  function findNextAvailableSlot(date, location, mode, afterMin){
+    var windows = findAvailableWindows(date, location, mode);
+    for(var i=0;i<windows.length;i++){
+      var w = windows[i];
+      var startAt = Math.max(w.s, afterMin);
+      if(startAt < w.e){ return {start: minutesToTime(startAt), end: minutesToTime(Math.min(startAt+60, w.e))}; }
+    }
+    return null;
+  }
+
+  function renderSlotSuggestions(date, location, mode){
+    var isRoom = mode === 'room';
+    var wrapId = isRoom ? 'roomSlotSuggestions' : 'davidSlotSuggestions';
+    var chipsId = isRoom ? 'roomSlotChips' : 'davidSlotChips';
+    var wrap = document.getElementById(wrapId);
+    var chipsEl = document.getElementById(chipsId);
+
+    if(!date || (isRoom && !location)){ wrap.classList.add('hidden'); return; }
+
+    var windows = findAvailableWindows(date, location, mode);
+    wrap.classList.remove('hidden');
+
+    if(!windows.length){
+      chipsEl.innerHTML = '<span class="slot-empty">這天目前沒有空閒時段</span>';
+      return;
+    }
+
+    chipsEl.innerHTML = windows.map(function(w){
+      var dur = w.e - w.s;
+      var durLabel = dur >= 120 ? '('+(dur/60)+'h)' : dur >= 60 ? '(1h)' : '('+dur+'m)';
+      return '<button type="button" class="slot-chip'+(isRoom?' room-chip':'')+'" data-start="'+minutesToTime(w.s)+'" data-end="'+minutesToTime(w.e)+'">'+minutesToTime(w.s)+'–'+minutesToTime(w.e)+'<span style="opacity:.7;font-size:11px;margin-left:4px;">'+durLabel+'</span></button>';
+    }).join('');
+
+    chipsEl.querySelectorAll('.slot-chip').forEach(function(chip){
+      chip.addEventListener('click', function(){
+        var startId = isRoom ? 'roomStart' : 'startInput';
+        var endId   = isRoom ? 'roomEnd'   : 'endInput';
+        var curDur  = 60; // default 1h
+        // try to use currently selected duration chip
+        var activeDur = document.querySelector((isRoom?'.room-dur-chip':'.dur-chip')+'.active');
+        if(activeDur) curDur = parseInt(activeDur.dataset.min, 10);
+        var wStart = timeToMinutes(chip.dataset.start);
+        var wEnd   = timeToMinutes(chip.dataset.end);
+        var end    = Math.min(wStart + curDur, wEnd);
+        document.getElementById(startId).value = chip.dataset.start;
+        document.getElementById(endId).value   = minutesToTime(end);
+        if(isRoom) checkRoomConflict(); else checkConflict();
+        document.querySelectorAll('.slot-chip').forEach(function(c){ c.style.fontWeight=''; });
+        chip.style.fontWeight = '800';
+      });
+    });
+  }
+
+  // ---------- recurring preview ----------
+  function updateRecurPreview(mode){
+    var isRoom = mode === 'room';
+    var dateId  = isRoom ? 'roomDate'      : 'dateInput';
+    var freqId  = isRoom ? 'roomRecurFreq'  : 'davidRecurFreq';
+    var countId = isRoom ? 'roomRecurCount' : 'davidRecurCount';
+    var prevId  = isRoom ? 'roomRecurPreview': 'davidRecurPreview';
+    var date = document.getElementById(dateId).value;
+    var freq = parseInt(document.getElementById(freqId).value, 10);
+    var count = parseInt(document.getElementById(countId).value, 10);
+    var preview = document.getElementById(prevId);
+    if(!date){ preview.textContent = '請先選擇日期'; return; }
+    var dates = [];
+    for(var i=0;i<count;i++){
+      dates.push(addDays(date, i*freq));
+    }
+    preview.textContent = '將建立 '+count+' 筆預約：'+dates.join('、');
   }
 
   // ---------- duration chips ----------
@@ -919,7 +1131,18 @@
     var s = timeToMinutes(start), e = timeToMinutes(end);
     var conflict = findConflict(bookings, date, loc, start, end, null);
     if(conflict){
-      warnBox.textContent = '⚠ ' + conflictMessage(conflict, loc);
+      var dmsg = '⚠ ' + conflictMessage(conflict, loc);
+      var dNext = findNextAvailableSlot(date, loc, 'david', timeToMinutes(conflict.end));
+      warnBox.innerHTML = escapeHtml(dmsg) + (dNext
+        ? '<br><button type="button" class="next-slot-btn" id="davidConflictNextBtn">→ 下一個空檔 '+escapeHtml(dNext.start)+'，點此帶入</button>'
+        : '');
+      if(dNext){
+        document.getElementById('davidConflictNextBtn').addEventListener('click', function(){
+          document.getElementById('startInput').value = dNext.start;
+          document.getElementById('endInput').value = dNext.end;
+          checkConflict();
+        });
+      }
       warnBox.classList.remove('hidden');
     } else {
       warnBox.classList.add('hidden');
@@ -970,12 +1193,21 @@
         checkConflict();
         return null;
       }
-      return insertBooking({
-        applicant: applicant, attendees: attendees, date: date,
-        location: location, start: start, end: end, subject: subject, status: 'pending'
-      });
-    }).then(function(result){
-      if(result === null) return;
+      // Build list of dates for recurring
+      var isRecur = document.getElementById('davidRecurCheck').checked;
+      var recurDates = [date];
+      if(isRecur){
+        var freq  = parseInt(document.getElementById('davidRecurFreq').value, 10);
+        var count = parseInt(document.getElementById('davidRecurCount').value, 10);
+        for(var ri=1; ri<count; ri++) recurDates.push(addDays(date, ri*freq));
+      }
+      return Promise.all(recurDates.map(function(d){
+        return insertBooking({ applicant: applicant, attendees: attendees, date: d,
+          location: location, start: start, end: end, subject: subject, status: 'pending' });
+      }));
+    }).then(function(results){
+      if(results === null) return;
+      try{ localStorage.setItem('mongen_last_name', applicant); }catch(e){}
       sendNotificationEmail({
         applicant: applicant, attendees: attendees, date: date,
         location: location, start: start, end: end, subject: subject
@@ -987,6 +1219,10 @@
       document.getElementById('endInput').value = '10:00';
       document.getElementById('tipBox').classList.add('hidden');
       document.getElementById('conflictWarning').classList.add('hidden');
+      document.getElementById('davidSlotSuggestions').classList.add('hidden');
+      document.getElementById('davidRecurCheck').checked = false;
+      document.getElementById('davidRecurOptions').classList.add('hidden');
+      document.querySelectorAll('.dur-chip').forEach(function(c){ c.classList.remove('active'); });
       return refreshData().then(function(){
         document.getElementById('successModal').classList.remove('hidden');
       });
@@ -1617,13 +1853,50 @@
     document.getElementById('roomDate').value = todayStr();
     document.getElementById('roomDate').min = todayStr();
 
-    // mode switcher
-    document.getElementById('modeDavidBtn').addEventListener('click', function(){ setCurrentMode('david'); });
+    // pre-fill name from localStorage
+    try{
+      var savedName = localStorage.getItem('mongen_last_name');
+      if(savedName){
+        document.getElementById('applicantInput').value = savedName;
+        document.getElementById('roomApplicant').value = savedName;
+        document.getElementById('lookupNameInput').value = savedName;
+      }
+    }catch(e){}
+
+    // slot suggestions triggers (David)
+    document.getElementById('dateInput').addEventListener('change', function(){
+      renderSlotSuggestions(this.value, document.getElementById('locationSelect').value, 'david');
+      checkConflict();
+      updateRecurPreview('david');
+    });
+
+    // slot suggestions triggers (Room)
+    document.getElementById('roomDate').addEventListener('change', function(){
+      renderSlotSuggestions(this.value, document.getElementById('roomLocation').value, 'room');
+      checkRoomConflict();
+      updateRecurPreview('room');
+    });
+    document.getElementById('roomLocation').addEventListener('change', function(){
+      renderSlotSuggestions(document.getElementById('roomDate').value, this.value, 'room');
+      checkRoomConflict();
+    });
+
+    // recurring toggles
+    document.getElementById('davidRecurCheck').addEventListener('change', function(){
+      document.getElementById('davidRecurOptions').classList.toggle('hidden', !this.checked);
+      if(this.checked) updateRecurPreview('david');
+    });
+    document.getElementById('davidRecurFreq').addEventListener('change', function(){ updateRecurPreview('david'); });
+    document.getElementById('davidRecurCount').addEventListener('change', function(){ updateRecurPreview('david'); });
+    document.getElementById('roomRecurCheck').addEventListener('change', function(){
+      document.getElementById('roomRecurOptions').classList.toggle('hidden', !this.checked);
+      if(this.checked) updateRecurPreview('room');
+    });
+    document.getElementById('roomRecurFreq').addEventListener('change', function(){ updateRecurPreview('room'); });
+    document.getElementById('roomRecurCount').addEventListener('change', function(){ updateRecurPreview('room'); });
     document.getElementById('modeRoomBtn').addEventListener('click', function(){ setCurrentMode('room'); });
 
-    // room form listeners
-    document.getElementById('roomLocation').addEventListener('change', checkRoomConflict);
-    document.getElementById('roomDate').addEventListener('change', checkRoomConflict);
+    // room form conflict listeners
     document.getElementById('roomStart').addEventListener('change', checkRoomConflict);
     document.getElementById('roomEnd').addEventListener('change', checkRoomConflict);
     document.getElementById('roomSubmitBtn').addEventListener('click', handleRoomSubmit);
@@ -1666,8 +1939,7 @@
       document.querySelectorAll('.dur-chip').forEach(function(c){ c.classList.remove('active'); });
     });
 
-    document.getElementById('locationSelect').addEventListener('change', function(){ updateTip(); checkConflict(); });
-    document.getElementById('dateInput').addEventListener('change', checkConflict);
+    document.getElementById('locationSelect').addEventListener('change', function(){ updateTip(); checkConflict(); renderSlotSuggestions(document.getElementById('dateInput').value, this.value, 'david'); });
     document.getElementById('startInput').addEventListener('change', checkConflict);
     document.getElementById('endInput').addEventListener('change', checkConflict);
     document.getElementById('bookingForm').addEventListener('submit', handleSubmit);
