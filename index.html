@@ -896,7 +896,7 @@
       warnBox.textContent = '結束時間必須晚於開始時間';
       warnBox.classList.remove('hidden'); return;
     }
-    var conflict = findConflict(bookings, date, loc, start, end, null);
+    var conflict = findConflict(bookings, date, loc, start, end, null, 'room');
     if(conflict){
       var rmsg = '⚠ ' + conflictMessage(conflict, loc);
       var rNext = findNextAvailableSlot(date, loc, 'room', timeToMinutes(conflict.end));
@@ -954,7 +954,7 @@
     // 送出前再確認衝突
     loadBookings().then(function(fresh){
       bookings = fresh;
-      var conflict = findConflict(fresh, date, location, start, end, null);
+      var conflict = findConflict(fresh, date, location, start, end, null, 'room');
       if(conflict){
         document.getElementById('conflictModalMsg').textContent = conflictMessage(conflict, location);
         document.getElementById('conflictModal').classList.remove('hidden');
@@ -1150,14 +1150,22 @@
     tipBox.classList.remove('hidden');
   }
 
-  function findConflict(list, date, location, start, end, excludeId){
+  function findConflict(list, date, location, start, end, excludeId, mode){
     var s = timeToMinutes(start), e = timeToMinutes(end);
     return list.find(function(b){
       if(b.status!=='approved' || b.date!==date || b.id===excludeId) return false;
       var overlap = timeToMinutes(b.start) < e && s < timeToMinutes(b.end);
       if(!overlap) return false;
-      if(b.type==='block') return true;
-      return b.location===location;
+      if(mode === 'room'){
+        // 會議室預約：只看同一間會議室有沒有被佔用
+        // 封鎖時段是 David 個人行程，不影響會議室是否可用
+        if(b.type === 'block') return false;
+        return b.location === location;
+      } else {
+        // David 預約：封鎖時段擋住 + 其他 David 行程擋住
+        if(b.type === 'block') return true;
+        return b.bookingMode === 'david';
+      }
     });
   }
 
@@ -1181,7 +1189,7 @@
       return;
     }
     var s = timeToMinutes(start), e = timeToMinutes(end);
-    var conflict = findConflict(bookings, date, loc, start, end, null);
+    var conflict = findConflict(bookings, date, loc, start, end, null, 'david');
     if(conflict){
       var dmsg = '⚠ ' + conflictMessage(conflict, loc);
       var dNext = findNextAvailableSlot(date, loc, 'david', timeToMinutes(conflict.end));
@@ -1238,7 +1246,7 @@
 
     loadBookings().then(function(fresh){
       bookings = fresh;
-      var conflict = findConflict(fresh, date, location, start, end, null);
+      var conflict = findConflict(fresh, date, location, start, end, null, 'david');
       if(conflict){
         document.getElementById('conflictModalMsg').textContent = conflictMessage(conflict, location);
         document.getElementById('conflictModal').classList.remove('hidden');
@@ -1819,7 +1827,7 @@
     }
     msg.classList.add('hidden');
 
-    var conflict = findConflict(bookings, date, location, start, end, null);
+    var conflict = findConflict(bookings, date, location, start, end, null, 'david');
     if(conflict){
       msg.textContent = '提醒：此時段有衝突（' + conflict.subject + '），仍可繼續新增，請確認是否繼續？';
       msg.classList.remove('hidden');
