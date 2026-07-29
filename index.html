@@ -90,7 +90,8 @@
   .event-block.compact{display:flex;align-items:center;padding:0 9px;}
   .event-block.compact .ec{font-size:11px;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .timeline-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:13.5px;}
-  .block-band{position:absolute;left:4px;right:4px;border-radius:8px;background:repeating-linear-gradient(135deg, rgba(43,36,32,.88), rgba(43,36,32,.88) 10px, rgba(43,36,32,.74) 10px, rgba(43,36,32,.74) 20px);display:flex;align-items:center;padding:0 12px;overflow:hidden;z-index:1;}
+  .block-band{position:absolute;left:4px;width:200px;border-radius:8px;background:repeating-linear-gradient(135deg,rgba(43,36,32,.82),rgba(43,36,32,.82) 8px,rgba(43,36,32,.68) 8px,rgba(43,36,32,.68) 16px);display:flex;align-items:flex-start;padding:7px 10px;overflow:hidden;z-index:2;}
+  .block-band-tint{position:absolute;left:0;right:0;background:rgba(43,36,32,.06);pointer-events:none;z-index:0;border-left:3px solid rgba(43,36,32,.3);}
   .block-label{color:#fff;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .now-line{position:absolute;left:0;right:0;border-top:2px solid #D9534F;z-index:5;}
 
@@ -1555,10 +1556,19 @@
       var bEndMin = timeToMinutes(ev.end) - DAY_START*60;
       var bTop = (bStartMin/60) * HOUR_HEIGHT;
       var bHeight = Math.max(((bEndMin-bStartMin)/60) * HOUR_HEIGHT, 30);
+
+      // Subtle full-width tint so the blocked period is visible without covering room bookings
+      var tint = document.createElement('div');
+      tint.className = 'block-band-tint';
+      tint.style.top = bTop + 'px';
+      tint.style.height = bHeight + 'px';
+      grid.appendChild(tint);
+
+      // Narrow left-side indicator strip with label
       var band = document.createElement('div');
       band.className = 'block-band';
-      band.style.top = bTop + 'px';
-      band.style.height = bHeight + 'px';
+      band.style.top = (bTop + 4) + 'px';
+      band.style.height = Math.max(bHeight - 8, 22) + 'px';
       band.title = ev.start+'–'+ev.end+' '+ev.subject;
       band.innerHTML = '<span class="block-label">🚫 '+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'　'+escapeHtml(ev.subject)+'</span>';
       grid.appendChild(band);
@@ -1590,6 +1600,7 @@
       block.style.left = 'calc(' + leftPct + '% + 4px)';
       block.style.width = 'calc(' + widthPct + '% - 8px)';
       block.style.background = ev.bookingMode==='room' ? ROOM_COLOR : locationInfo(ev.location).color;
+      block.style.zIndex = '3';
       block.title = ev.start+'–'+ev.end+' '+ev.subject+'／'+ev.location+'／'+(ev.bookingMode==='room'?ev.applicant+' ('+ev.department+')':ev.applicant);
       var prefix = ev.bookingMode==='room' ? '🏢 ' : '';
 
