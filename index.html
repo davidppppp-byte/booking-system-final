@@ -190,6 +190,25 @@
   .cancel-booking-btn:hover{background:var(--danger-bg);border-color:var(--danger);}
   .now-dot{position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#D9534F;}
   .now-label{position:absolute;left:8px;top:-17px;font-size:10.5px;color:#D9534F;font-weight:700;font-family:var(--mono);background:#fff;padding:0 4px;border-radius:4px;}
+  /* ── 出席者選擇 ── */
+  .participants-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .participant-btn{padding:9px 16px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:13.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+  .participant-btn:hover{border-color:var(--accent);}
+  .participant-btn.active[data-p="david"]{background:var(--amberLt,#FBF6EC);border-color:var(--accent);color:var(--accent-dark);}
+  .participant-btn.active[data-p="yawas"]{background:#EAF0F8;border-color:#3B6EA5;color:#2A5085;}
+  .participant-btn.active[data-p="both"]{background:#F2EEF8;border-color:#7C5C8C;color:#5C3D6E;}
+
+  /* ── 審核狀態 ── */
+  .approval-status{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  .apv-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:700;}
+  .apv-chip.done{background:#EAF0E6;color:#5C7A52;}
+  .apv-chip.wait{background:#FBF6EC;color:#B8862B;}
+  .apv-chip.reject{background:#F8E9E6;color:#B5483D;}
+  .apv-chip.na{background:#F0EDEA;color:#9C9488;}
+
+  /* ── Yawas / Both 顏色 ── */
+  :root{--yawas-color:#3B6EA5;--both-color:#7C5C8C;}
+
   /* ── 快速登記 banner ── */
   .quickbook-banner{background:linear-gradient(135deg,#2B5C4B,#3E7A67);color:#fff;border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;}
   .quickbook-banner .qb-icon{font-size:28px;flex-shrink:0;}
@@ -296,6 +315,16 @@
           <div class="field">
             <label for="attendeesInput">與會人<span class="opt">選填</span></label>
             <input type="text" id="attendeesInput" placeholder="選填">
+          </div>
+
+          <div class="field full">
+            <label>出席者<span class="req">*</span></label>
+            <div class="participants-row" id="participantsRow">
+              <button type="button" class="participant-btn active" data-p="david">🤝 David</button>
+              <button type="button" class="participant-btn" data-p="yawas">👔 Yawas</button>
+              <button type="button" class="participant-btn" data-p="both">👥 兩位都需要</button>
+            </div>
+            <input type="hidden" id="participantsInput" value="david">
           </div>
           <div class="field">
             <label for="dateInput">日期<span class="req">*</span></label>
@@ -493,6 +522,7 @@
       <div class="cal-filter">
         <button type="button" class="cfil-btn active" id="filterAllBtn">全部</button>
         <button type="button" class="cfil-btn" id="filterDavidBtn">只看 David</button>
+        <button type="button" class="cfil-btn" id="filterYawasBtn">只看 Yawas</button>
       </div>
       <div class="view-toggle">
         <button type="button" class="vtog-btn active" id="viewDayBtn">日</button>
@@ -535,7 +565,7 @@
 <div id="adminPanel" class="hidden">
   <div class="container">
     <div class="admin-header">
-      <h1>管理後台</h1>
+      <h1 id="adminPanelTitle">管理後台</h1>
       <div class="actions">
         <button type="button" class="ghost-btn" id="adminRefreshBtn">⟳ 重新整理</button>
         <button type="button" class="ghost-btn" id="backToMainBtn">返回預約頁面</button>
@@ -682,7 +712,10 @@
   var SUPABASE_ANON_KEY = 'sb_publishable_Vt7_9R7Ckqlnw6k4oKOvbg_PeXu1Rj5';
   var TABLE_NAME = 'bookings';
 
-  var ADMIN_PASSWORD = '25773388';
+  var ADMIN_PASSWORD = '25773388';   // David
+  var YAWAS_PASSWORD = 'yawas2024';  // Yawas（可請 Yawas 自行修改）
+  var YAWAS_COLOR = '#3B6EA5';
+  var BOTH_PERSON_COLOR = '#7C5C8C';
   var DAY_START = 8, DAY_END = 17;
   var HOUR_HEIGHT = 56;
 
@@ -711,9 +744,10 @@
   var bookings = [];
   var currentViewDate = todayStr();
   var calendarView = 'day';
-  var calendarFilter = 'all'; // 'all' | 'david'
+  var calendarFilter = 'all'; // 'all' | 'david' | 'yawas'
   var currentMode = 'david';  // 'david' | 'room'
   var isAdmin = false;
+  var currentAdmin = null; // 'david' | 'yawas'
   var adminTab = 'pending';
 
   // ---------- helpers ----------
@@ -763,6 +797,10 @@
       status: row.status,
       type: row.type || 'meeting',
       bookingMode: row.booking_mode || 'david',
+      participants: row.participants || 'david',
+      approverDavid: row.approver_david,
+      approverYawas: row.approver_yawas,
+      blockedFor: row.blocked_for || 'david',
       department: row.department || '',
       attendeeCount: row.attendee_count || null,
       notes: row.notes || '',
@@ -781,6 +819,10 @@
       status: b.status || 'pending',
       type: b.type || 'meeting',
       booking_mode: b.bookingMode || 'david',
+      participants: b.participants || 'david',
+      approver_david: b.approverDavid !== undefined ? b.approverDavid : null,
+      approver_yawas: b.approverYawas !== undefined ? b.approverYawas : null,
+      blocked_for: b.blockedFor || null,
       department: b.department || null,
       attendee_count: b.attendeeCount || null,
       notes: b.notes || null
@@ -809,7 +851,10 @@
   }
 
   function updateBookingStatus(id, status){
-    return supabaseClient.from(TABLE_NAME).update({status: status}).eq('id', id).then(function(res){
+    return updateBookingFields(id, {status: status});
+  }
+  function updateBookingFields(id, fields){
+    return supabaseClient.from(TABLE_NAME).update(fields).eq('id', id).then(function(res){
       if(res.error) throw res.error;
       return true;
     });
@@ -875,12 +920,24 @@
     calendarFilter = filter;
     document.getElementById('filterAllBtn').classList.toggle('active', filter==='all');
     document.getElementById('filterDavidBtn').classList.toggle('active', filter==='david');
+    document.getElementById('filterYawasBtn').classList.toggle('active', filter==='yawas');
     renderTimeline();
   }
 
   function getFilteredBookings(){
     if(calendarFilter === 'david'){
-      return bookings.filter(function(b){ return b.bookingMode === 'david'; });
+      return bookings.filter(function(b){
+        if(b.bookingMode==='room') return false;
+        if(b.type==='block') return b.blockedFor==='david';
+        return b.participants==='david' || b.participants==='both';
+      });
+    }
+    if(calendarFilter === 'yawas'){
+      return bookings.filter(function(b){
+        if(b.bookingMode==='room') return false;
+        if(b.type==='block') return b.blockedFor==='yawas';
+        return b.participants==='yawas' || b.participants==='both';
+      });
     }
     return bookings;
   }
@@ -1151,30 +1208,43 @@
     tipBox.classList.remove('hidden');
   }
 
-  function findConflict(list, date, location, start, end, excludeId, mode){
+  function findConflict(list, date, location, start, end, excludeId, mode, participants){
     var s = timeToMinutes(start), e = timeToMinutes(end);
+    var persons = participants || 'david';
+    var checkDavid = persons==='david' || persons==='both';
+    var checkYawas = persons==='yawas' || persons==='both';
     return list.find(function(b){
       if(b.status!=='approved' || b.date!==date || b.id===excludeId) return false;
       var overlap = timeToMinutes(b.start) < e && s < timeToMinutes(b.end);
       if(!overlap) return false;
-      if(mode === 'room'){
-        // 會議室預約：只看同一間會議室有沒有被佔用
-        // 封鎖時段是 David 個人行程，不影響會議室是否可用
-        if(b.type === 'block') return false;
-        return b.location === location;
-      } else {
-        // David 預約：封鎖時段擋住 + 其他 David 行程擋住
-        if(b.type === 'block') return true;
-        return b.bookingMode === 'david';
+      if(mode==='room'){
+        if(b.type==='block') return false;
+        return b.location===location;
       }
+      if(b.type==='block'){
+        if(checkDavid && b.blockedFor==='david') return true;
+        if(checkYawas && b.blockedFor==='yawas') return true;
+        return false;
+      }
+      if(b.bookingMode!=='david') return false;
+      var bD = b.participants==='david'||b.participants==='both';
+      var bY = b.participants==='yawas'||b.participants==='both';
+      if(checkDavid && bD) return true;
+      if(checkYawas && bY) return true;
+      return false;
     });
   }
 
   function conflictMessage(conflict, location){
     if(conflict.type==='block'){
-      return 'David 這個時段無法安排會議（' + conflict.subject + '），請更換時間。';
+      var who = conflict.blockedFor==='yawas' ? 'Yawas' : 'David';
+      return who+' 這個時段無法安排會議（'+conflict.subject+'），請更換時間。';
     }
-    return '此時段「' + location + '」已被《' + conflict.subject + '》（' + conflict.applicant + '，' + conflict.start + '–' + conflict.end + '）預約，請更換時間或地點。';
+    if(conflict.bookingMode==='room'){
+      return '此時段「'+location+'」已被《'+conflict.subject+'》（'+conflict.applicant+'，'+conflict.start+'–'+conflict.end+'）預約，請更換時間或地點。';
+    }
+    var who = conflict.participants==='yawas'?'Yawas':conflict.participants==='both'?'David / Yawas':'David';
+    return who+' 這個時段已有會議《'+conflict.subject+'》（'+conflict.start+'–'+conflict.end+'），請更換時間。';
   }
 
   function checkConflict(){
@@ -1190,7 +1260,8 @@
       return;
     }
     var s = timeToMinutes(start), e = timeToMinutes(end);
-    var conflict = findConflict(bookings, date, loc, start, end, null, 'david');
+    var persons = document.getElementById('participantsInput').value || 'david';
+    var conflict = findConflict(bookings, date, loc, start, end, null, 'david', persons);
     if(conflict){
       var dmsg = '⚠ ' + conflictMessage(conflict, loc);
       var dNext = findNextAvailableSlot(date, loc, 'david', timeToMinutes(conflict.end));
@@ -1220,6 +1291,7 @@
     e.preventDefault();
     var applicant = document.getElementById('applicantInput').value.trim();
     var attendees = document.getElementById('attendeesInput').value.trim();
+    var participants = document.getElementById('participantsInput').value || 'david';
     var date = document.getElementById('dateInput').value;
     var location = document.getElementById('locationSelect').value;
     var start = document.getElementById('startInput').value;
@@ -1247,7 +1319,7 @@
 
     loadBookings().then(function(fresh){
       bookings = fresh;
-      var conflict = findConflict(fresh, date, location, start, end, null, 'david');
+      var conflict = findConflict(fresh, date, location, start, end, null, 'david', participants);
       if(conflict){
         document.getElementById('conflictModalMsg').textContent = conflictMessage(conflict, location);
         document.getElementById('conflictModal').classList.remove('hidden');
@@ -1264,7 +1336,10 @@
       }
       return Promise.all(recurDates.map(function(d){
         return insertBooking({ applicant: applicant, attendees: attendees, date: d,
-          location: location, start: start, end: end, subject: subject, status: 'pending' });
+          location: location, start: start, end: end, subject: subject, status: 'pending',
+          participants: participants,
+          approverDavid: participants==='yawas' ? null : null,
+          approverYawas: participants==='david' ? null : null });
       }));
     }).then(function(results){
       if(results === null) return;
@@ -1506,9 +1581,12 @@
         dayEvents.forEach(function(ev){
           var chip = document.createElement('div');
           chip.className = 'week-chip' + (ev.type==='block' ? ' block-chip' : '');
-          if(ev.type!=='block'){
-            chip.style.background = ev.bookingMode==='room' ? ROOM_COLOR : locationInfo(ev.location).color;
-          }
+          chip.style.background = ev.type!=='block'
+            ? (ev.bookingMode==='room' ? ROOM_COLOR
+              : ev.participants==='yawas' ? YAWAS_COLOR
+              : ev.participants==='both'  ? BOTH_PERSON_COLOR
+              : locationInfo(ev.location).color)
+            : undefined;
           chip.title = ev.start+'–'+ev.end+' '+ev.subject+(ev.type!=='block'?' / '+ev.location+(ev.bookingMode==='room'?' / '+ev.department:' / '+ev.applicant):'');
           chip.innerHTML = '<div class="wct">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
             '<div class="wcs">'+(ev.type==='block'?'🚫 ':ev.bookingMode==='room'?'🏢 ':'')+escapeHtml(ev.subject)+'</div>';
@@ -1599,7 +1677,10 @@
       block.style.height = height + 'px';
       block.style.left = 'calc(' + leftPct + '% + 4px)';
       block.style.width = 'calc(' + widthPct + '% - 8px)';
-      block.style.background = ev.bookingMode==='room' ? ROOM_COLOR : locationInfo(ev.location).color;
+      block.style.background = ev.bookingMode==='room' ? ROOM_COLOR
+        : ev.participants==='yawas' ? YAWAS_COLOR
+        : ev.participants==='both'  ? BOTH_PERSON_COLOR
+        : locationInfo(ev.location).color;
       block.style.zIndex = '3';
       block.title = ev.start+'–'+ev.end+' '+ev.subject+'／'+ev.location+'／'+(ev.bookingMode==='room'?ev.applicant+' ('+ev.department+')':ev.applicant);
       var prefix = ev.bookingMode==='room' ? '🏢 ' : '';
@@ -1650,7 +1731,11 @@
     var val = document.getElementById('adminPasswordInput').value;
     if(val === ADMIN_PASSWORD){
       closeAdminPasswordModal();
-      isAdmin = true;
+      currentAdmin = 'david'; isAdmin = true;
+      showAdminPanel();
+    } else if(val === YAWAS_PASSWORD){
+      closeAdminPasswordModal();
+      currentAdmin = 'yawas'; isAdmin = true;
       showAdminPanel();
     } else {
       document.getElementById('adminPasswordError').classList.remove('hidden');
@@ -1659,12 +1744,13 @@
   function showAdminPanel(){
     document.getElementById('mainView').classList.add('hidden');
     document.getElementById('adminPanel').classList.remove('hidden');
+    document.getElementById('adminPanelTitle').textContent = (currentAdmin==='yawas'?'Yawas':'David')+' 管理後台';
     adminTab = 'pending';
     renderAdminTabs();
     renderAdminList();
   }
   function hideAdminPanel(){
-    isAdmin = false;
+    isAdmin = false; currentAdmin = null;
     document.getElementById('adminPanel').classList.add('hidden');
     document.getElementById('mainView').classList.remove('hidden');
   }
@@ -1676,26 +1762,33 @@
   function renderAdminList(){
     var list = document.getElementById('adminList');
     list.innerHTML = '';
+    var me = currentAdmin || 'david';
+    var myParticipants = me === 'yawas' ? ['yawas','both'] : ['david','both'];
 
+    // Counts: only show bookings relevant to this admin
     ['pending','approved','rejected'].forEach(function(s){
-      var c = bookings.filter(function(b){ return b.status===s && b.type!=='block' && b.bookingMode==='david'; }).length;
+      var c = bookings.filter(function(b){
+        return b.status===s && b.type!=='block' && b.bookingMode==='david' &&
+          myParticipants.indexOf(b.participants)>-1;
+      }).length;
       var el = document.getElementById('count-'+s);
       if(el) el.textContent = c;
     });
     var blockCountEl = document.getElementById('count-blocked');
-    if(blockCountEl) blockCountEl.textContent = bookings.filter(function(b){ return b.type==='block'; }).length;
+    if(blockCountEl) blockCountEl.textContent = bookings.filter(function(b){ return b.type==='block' && b.blockedFor===me; }).length;
     var roomCountEl = document.getElementById('count-room');
     if(roomCountEl) roomCountEl.textContent = bookings.filter(function(b){ return b.bookingMode==='room'; }).length;
 
     document.getElementById('blockFormCard').classList.toggle('hidden', adminTab !== 'blocked');
     document.getElementById('adminAddFormCard').classList.toggle('hidden', adminTab !== 'admin-add');
-
     if(adminTab === 'blocked'){ renderBlockedList(list); return; }
     if(adminTab === 'admin-add'){ list.innerHTML = ''; return; }
     if(adminTab === 'room-bookings'){ renderRoomBookingList(list); return; }
 
-    var filtered = bookings.filter(function(b){ return b.status===adminTab && b.type!=='block' && b.bookingMode==='david'; })
-      .sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); });
+    var filtered = bookings.filter(function(b){
+      return b.status===adminTab && b.type!=='block' && b.bookingMode==='david' &&
+        myParticipants.indexOf(b.participants)>-1;
+    }).sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); });
 
     if(filtered.length===0){
       list.innerHTML = '<div class="empty-list">目前沒有' + tabLabel(adminTab) + '的預約</div>';
@@ -1706,17 +1799,44 @@
       var info = locationInfo(b.location);
       var row = document.createElement('div');
       row.className = 'booking-row';
+
+      // Participants badge
+      var pLabel = b.participants==='both' ? '👥 David + Yawas' : b.participants==='yawas' ? '👔 Yawas' : '🤝 David';
+      var pColor = b.participants==='both' ? BOTH_PERSON_COLOR : b.participants==='yawas' ? YAWAS_COLOR : '#C17F3B';
+
+      // Approval status chips for 'both' bookings
+      var approvalHtml = '';
+      if(b.participants==='both'){
+        function chip(label, state){
+          var cls = state===true?'done':state===false?'reject':'wait';
+          var icon = state===true?'✓':state===false?'✗':'⏳';
+          return '<span class="apv-chip '+cls+'">'+icon+' '+label+'</span>';
+        }
+        approvalHtml = '<div class="approval-status">'+chip('David',b.approverDavid)+chip('Yawas',b.approverYawas)+'</div>';
+      }
+
+      // Action buttons: pending tab shows approve/reject; already-actioned shows status
+      var myApprover = me==='yawas' ? b.approverYawas : b.approverDavid;
       var actionsHtml = '';
-      if(adminTab !== 'approved') actionsHtml += '<button class="action-btn approve" data-action="approved">通過</button>';
-      if(adminTab !== 'rejected') actionsHtml += '<button class="action-btn reject" data-action="rejected">拒絕</button>';
-      if(adminTab !== 'pending') actionsHtml += '<button class="action-btn restore" data-action="pending">改為待審</button>';
+      if(adminTab === 'pending'){
+        if(myApprover === null || myApprover === undefined){
+          actionsHtml += '<button class="action-btn approve" data-action="approve">通過</button>';
+          actionsHtml += '<button class="action-btn reject" data-action="reject">拒絕</button>';
+        } else {
+          actionsHtml += myApprover
+            ? '<span style="font-size:12.5px;color:#5C7A52;font-weight:700;">✓ 您已通過<br><small style=\'color:#B8862B;\'>等待另一人確認</small></span>'
+            : '<span style="font-size:12.5px;color:#B5483D;font-weight:700;">✗ 您已拒絕</span>';
+        }
+      }
+      if(adminTab !== 'pending') actionsHtml += '<button class="action-btn restore" data-action="restore">改為待審</button>';
       actionsHtml += '<button class="action-btn delete" data-action="delete">刪除</button>';
 
       row.innerHTML =
         '<div class="info">' +
-          '<div class="top-line">'+escapeHtml(b.date)+' · '+escapeHtml(b.start)+'–'+escapeHtml(b.end)+' · <span style="color:'+info.color+';font-weight:700;">'+escapeHtml(b.location)+'</span></div>' +
+          '<div class="top-line">'+escapeHtml(b.date)+' · '+escapeHtml(b.start)+'–'+escapeHtml(b.end)+' · <span style="color:'+info.color+';font-weight:700;">'+escapeHtml(b.location)+'</span>'+
+          ' <span style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:700;background:'+pColor+'22;color:'+pColor+'">'+pLabel+'</span></div>' +
           '<div class="subject">'+escapeHtml(b.subject)+'</div>' +
-          '<div class="meta">預約人：'+escapeHtml(b.applicant) + (b.attendees ? ' ・ 與會人：'+escapeHtml(b.attendees) : '') + '</div>' +
+          '<div class="meta">預約人：'+escapeHtml(b.applicant)+(b.attendees?' ・ 與會人：'+escapeHtml(b.attendees):'')+approvalHtml+'</div>' +
           '<div class="applied-at">申請時間：'+formatDateTime(b.createdAt)+'</div>' +
         '</div>' +
         '<div class="row-actions" data-id="'+b.id+'">' + actionsHtml + '</div>';
@@ -1725,7 +1845,8 @@
   }
 
   function renderBlockedList(list){
-    var blocks = bookings.filter(function(b){ return b.type==='block'; })
+    var me = currentAdmin || 'david';
+    var blocks = bookings.filter(function(b){ return b.type==='block' && b.blockedFor===me; })
       .sort(function(a,b){
         if(a.date !== b.date) return a.date < b.date ? -1 : 1;
         return timeToMinutes(a.start) - timeToMinutes(b.start);
@@ -1749,6 +1870,30 @@
     });
   }
 
+  function handleApproval(id, decision){
+    // decision: 'approve' | 'reject'
+    loadBookings().then(function(fresh){
+      var b = fresh.find(function(x){ return x.id===id; });
+      if(!b) return;
+      var me = currentAdmin || 'david';
+      var fields = {};
+      if(me==='yawas') fields.approver_yawas = decision==='approve';
+      else             fields.approver_david  = decision==='approve';
+
+      if(decision==='reject'){
+        fields.status = 'rejected';
+      } else {
+        // Check if all required persons have approved
+        var davidOk = b.participants==='yawas' || (me==='david') || (b.approverDavid===true);
+        var yawasOk = b.participants==='david' || (me==='yawas') || (b.approverYawas===true);
+        if(davidOk && yawasOk) fields.status = 'approved';
+        // else stays pending
+      }
+      return updateBookingFields(id, fields);
+    }).then(function(){ return refreshData(); })
+    .catch(function(err){ console.error('審核失敗', err); alert('審核失敗，請確認網路連線後再試一次'); });
+  }
+
   function handleAdminListClick(e){
     var btn = e.target.closest('button.action-btn');
     if(!btn) return;
@@ -1756,30 +1901,29 @@
     var id = rowActions.dataset.id;
     var action = btn.dataset.action;
 
+    if(action==='approve' || action==='reject'){
+      handleApproval(id, action);
+      return;
+    }
+
     if(action === 'delete'){
       if(btn.classList.contains('confirm')){
-        deleteBookingRow(id).then(function(){
-          return refreshData();
-        }).catch(function(err){
-          console.error('刪除失敗', err);
-          alert('刪除失敗，請確認網路連線後再試一次');
-        });
+        deleteBookingRow(id).then(function(){ return refreshData(); })
+        .catch(function(err){ console.error('刪除失敗', err); alert('刪除失敗，請確認網路連線後再試一次'); });
       } else {
-        btn.classList.add('confirm');
-        btn.textContent = '確定刪除？';
-        setTimeout(function(){
-          if(btn.isConnected){ btn.classList.remove('confirm'); btn.textContent = '刪除'; }
-        }, 3000);
+        btn.classList.add('confirm'); btn.textContent = '確定刪除？';
+        setTimeout(function(){ if(btn.isConnected){ btn.classList.remove('confirm'); btn.textContent = '刪除'; } }, 3000);
       }
       return;
     }
 
-    updateBookingStatus(id, action).then(function(){
-      return refreshData();
-    }).catch(function(err){
-      console.error('更新失敗', err);
-      alert('更新失敗，請確認網路連線後再試一次');
-    });
+    if(action === 'restore'){
+      var fields = {status:'pending'};
+      if(currentAdmin==='yawas') fields.approver_yawas = null;
+      else fields.approver_david = null;
+      updateBookingFields(id, fields).then(function(){ return refreshData(); })
+      .catch(function(err){ console.error('更新失敗', err); alert('更新失敗，請確認網路連線後再試一次'); });
+    }
   }
 
   function renderRoomBookingList(list){
@@ -1886,11 +2030,14 @@
     }
     msg.classList.add('hidden');
 
+    var me = currentAdmin || 'david';
+    var meLabel = me==='yawas' ? 'Yawas' : 'David';
     insertBooking({
-      applicant: 'David', attendees: '', date: date,
+      applicant: meLabel, attendees: '', date: date,
       location: '(不開放預約)', start: start, end: end,
-      subject: reason || 'David 目前無法安排會議',
-      status: 'approved', type: 'block'
+      subject: reason || meLabel+' 目前無法安排會議',
+      status: 'approved', type: 'block',
+      blockedFor: me
     }).then(function(){
       document.getElementById('blockReasonInput').value = '';
       return refreshData();
@@ -2044,6 +2191,18 @@
     document.getElementById('mainRefreshBtn').addEventListener('click', refreshData);
     document.getElementById('filterAllBtn').addEventListener('click', function(){ setCalendarFilter('all'); });
     document.getElementById('filterDavidBtn').addEventListener('click', function(){ setCalendarFilter('david'); });
+    document.getElementById('filterYawasBtn').addEventListener('click', function(){ setCalendarFilter('yawas'); });
+
+    // Participants selector
+    document.querySelectorAll('#participantsRow .participant-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('#participantsRow .participant-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        document.getElementById('participantsInput').value = btn.dataset.p;
+        checkConflict();
+        renderSlotSuggestions(document.getElementById('dateInput').value, document.getElementById('locationSelect').value, 'david');
+      });
+    });
     document.getElementById('viewDayBtn').addEventListener('click', function(){ setCalendarView('day'); });
     document.getElementById('viewWeekBtn').addEventListener('click', function(){ setCalendarView('week'); });
     document.getElementById('lookupBtn').addEventListener('click', handleLookup);
