@@ -294,8 +294,9 @@
     <div class="mode-switcher">
       <button type="button" class="mode-btn active" id="modeDavidBtn">
         <div class="mb-icon">🤝</div>
-        <span class="mb-title">跟 David 約時間</span>
+        <span class="mb-title">與主管約時間</span>
         <span class="mb-sub">需審核，通過後出現在行事曆</span>
+        <span class="mb-sub" style="margin-top:3px;opacity:.7;">預約完成將同時預定會議室</span>
       </button>
       <button type="button" class="mode-btn room-mode" id="modeRoomBtn">
         <div class="mb-icon">🏢</div>
@@ -2112,6 +2113,7 @@
     });
     document.getElementById('roomRecurFreq').addEventListener('change', function(){ updateRecurPreview('room'); });
     document.getElementById('roomRecurCount').addEventListener('change', function(){ updateRecurPreview('room'); });
+    document.getElementById('modeDavidBtn').addEventListener('click', function(){ setCurrentMode('david'); });
     document.getElementById('modeRoomBtn').addEventListener('click', function(){ setCurrentMode('room'); });
 
     // room form conflict listeners
