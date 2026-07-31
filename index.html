@@ -91,7 +91,6 @@
   .event-block.compact .ec{font-size:11px;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .timeline-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:13.5px;}
   .block-band{position:absolute;left:4px;width:200px;border-radius:8px;background:repeating-linear-gradient(135deg,rgba(43,36,32,.82),rgba(43,36,32,.82) 8px,rgba(43,36,32,.68) 8px,rgba(43,36,32,.68) 16px);display:flex;align-items:flex-start;padding:7px 10px;overflow:hidden;z-index:2;}
-  .block-band-tint{position:absolute;left:0;right:0;background:rgba(43,36,32,.06);pointer-events:none;z-index:0;border-left:3px solid rgba(43,36,32,.3);}
   .block-label{color:#fff;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .now-line{position:absolute;left:0;right:0;border-top:2px solid #D9534F;z-index:5;}
 
@@ -322,7 +321,7 @@
             <label>出席者<span class="req">*</span></label>
             <div class="participants-row" id="participantsRow">
               <button type="button" class="participant-btn active" data-p="david">🤝 David</button>
-              <button type="button" class="participant-btn" data-p="yawas">👔 Yawas</button>
+              <button type="button" class="participant-btn" data-p="yawas">👩 Yawas</button>
               <button type="button" class="participant-btn" data-p="both">👥 兩位都需要</button>
             </div>
             <input type="hidden" id="participantsInput" value="david">
@@ -590,7 +589,7 @@
           <label>此行程屬於<span class="req">*</span></label>
           <div class="participants-row" id="adminAddParticipantsRow">
             <button type="button" class="participant-btn" data-p="david">🤝 David</button>
-            <button type="button" class="participant-btn" data-p="yawas">👔 Yawas</button>
+            <button type="button" class="participant-btn" data-p="yawas">👩 Yawas</button>
             <button type="button" class="participant-btn" data-p="both">👥 兩位都有</button>
           </div>
           <input type="hidden" id="adminAddParticipants" value="david">
@@ -1082,14 +1081,28 @@
   }
 
   // ---------- smart slot suggestions ----------
-  function getBlockedIntervals(date, location, mode){
+  function getBlockedIntervals(date, location, mode, person){
     var ivs = [];
+    var p = person || 'david';
+    var checkDavid = p==='david' || p==='both';
+    var checkYawas = p==='yawas' || p==='both';
     bookings.forEach(function(b){
       if(b.status !== 'approved' || b.date !== date) return;
       var s = timeToMinutes(b.start), e = timeToMinutes(b.end);
-      if(b.type === 'block'){ ivs.push({s:s, e:e}); return; }
-      if(mode === 'david' && b.bookingMode === 'david'){ ivs.push({s:s, e:e}); return; }
-      if(mode === 'room' && b.location === location){ ivs.push({s:s, e:e}); }
+      if(mode === 'room'){
+        if(b.type === 'block') return;
+        if(b.location === location) ivs.push({s:s, e:e});
+        return;
+      }
+      if(b.type === 'block'){
+        if(checkDavid && b.blockedFor==='david') ivs.push({s:s, e:e});
+        if(checkYawas && b.blockedFor==='yawas') ivs.push({s:s, e:e});
+        return;
+      }
+      if(b.bookingMode !== 'david') return;
+      var bD = b.participants==='david' || b.participants==='both';
+      var bY = b.participants==='yawas' || b.participants==='both';
+      if((checkDavid && bD) || (checkYawas && bY)) ivs.push({s:s, e:e});
     });
     ivs.sort(function(a,b){ return a.s - b.s; });
     var merged = [];
@@ -1100,8 +1113,8 @@
     return merged;
   }
 
-  function findAvailableWindows(date, location, mode){
-    var blocked = getBlockedIntervals(date, location, mode);
+  function findAvailableWindows(date, location, mode, person){
+    var blocked = getBlockedIntervals(date, location, mode, person);
     var dayS = DAY_START*60, dayE = DAY_END*60;
     var free = [], cursor = dayS;
     blocked.forEach(function(iv){
@@ -1113,8 +1126,8 @@
     return free.filter(function(w){ return w.e - w.s >= 30; });
   }
 
-  function findNextAvailableSlot(date, location, mode, afterMin){
-    var windows = findAvailableWindows(date, location, mode);
+  function findNextAvailableSlot(date, location, mode, afterMin, person){
+    var windows = findAvailableWindows(date, location, mode, person);
     for(var i=0;i<windows.length;i++){
       var w = windows[i];
       var startAt = Math.max(w.s, afterMin);
@@ -1123,16 +1136,27 @@
     return null;
   }
 
-  function renderSlotSuggestions(date, location, mode){
+  function renderSlotSuggestions(date, location, mode, person){
     var isRoom = mode === 'room';
     var wrapId = isRoom ? 'roomSlotSuggestions' : 'davidSlotSuggestions';
     var chipsId = isRoom ? 'roomSlotChips' : 'davidSlotChips';
+    var labelId = isRoom ? null : 'davidSlotLabel';
     var wrap = document.getElementById(wrapId);
     var chipsEl = document.getElementById(chipsId);
+    var p = person || 'david';
 
     if(!date || (isRoom && !location)){ wrap.classList.add('hidden'); return; }
 
-    var windows = findAvailableWindows(date, location, mode);
+    // Update label based on person
+    if(!isRoom && labelId){
+      var labelEl = wrap.querySelector('.slot-suggestions-label');
+      if(labelEl){
+        var labelText = p==='both' ? '📅 兩人都空的時段' : p==='yawas' ? '📅 當天 Yawas 空檔' : '📅 當天 David 空檔';
+        labelEl.textContent = labelText;
+      }
+    }
+
+    var windows = findAvailableWindows(date, location, mode, p);
     wrap.classList.remove('hidden');
 
     if(!windows.length){
@@ -1150,8 +1174,7 @@
       chip.addEventListener('click', function(){
         var startId = isRoom ? 'roomStart' : 'startInput';
         var endId   = isRoom ? 'roomEnd'   : 'endInput';
-        var curDur  = 60; // default 1h
-        // try to use currently selected duration chip
+        var curDur  = 60;
         var activeDur = document.querySelector((isRoom?'.room-dur-chip':'.dur-chip')+'.active');
         if(activeDur) curDur = parseInt(activeDur.dataset.min, 10);
         var wStart = timeToMinutes(chip.dataset.start);
@@ -1274,7 +1297,7 @@
     var conflict = findConflict(bookings, date, loc, start, end, null, 'david', persons);
     if(conflict){
       var dmsg = '⚠ ' + conflictMessage(conflict, loc);
-      var dNext = findNextAvailableSlot(date, loc, 'david', timeToMinutes(conflict.end));
+      var dNext = findNextAvailableSlot(date, loc, 'david', timeToMinutes(conflict.end), document.getElementById('participantsInput').value);
       warnBox.innerHTML = escapeHtml(dmsg) + (dNext
         ? '<br><button type="button" class="next-slot-btn" id="davidConflictNextBtn">→ 下一個空檔 '+escapeHtml(dNext.start)+'，點此帶入</button>'
         : '');
@@ -1645,14 +1668,6 @@
       var bTop = (bStartMin/60) * HOUR_HEIGHT;
       var bHeight = Math.max(((bEndMin-bStartMin)/60) * HOUR_HEIGHT, 30);
 
-      // Subtle full-width tint so the blocked period is visible without covering room bookings
-      var tint = document.createElement('div');
-      tint.className = 'block-band-tint';
-      tint.style.top = bTop + 'px';
-      tint.style.height = bHeight + 'px';
-      grid.appendChild(tint);
-
-      // Narrow left-side indicator strip with label
       var band = document.createElement('div');
       band.className = 'block-band';
       band.style.top = (bTop + 4) + 'px';
@@ -1817,7 +1832,7 @@
       row.className = 'booking-row';
 
       // Participants badge
-      var pLabel = b.participants==='both' ? '👥 David + Yawas' : b.participants==='yawas' ? '👔 Yawas' : '🤝 David';
+      var pLabel = b.participants==='both' ? '👥 David + Yawas' : b.participants==='yawas' ? '👩 Yawas' : '🤝 David';
       var pColor = b.participants==='both' ? BOTH_PERSON_COLOR : b.participants==='yawas' ? YAWAS_COLOR : '#C17F3B';
 
       // Approval status chips for 'both' bookings
@@ -2103,7 +2118,7 @@
 
     // slot suggestions triggers (David)
     document.getElementById('dateInput').addEventListener('change', function(){
-      renderSlotSuggestions(this.value, document.getElementById('locationSelect').value, 'david');
+      renderSlotSuggestions(this.value, document.getElementById('locationSelect').value, 'david', document.getElementById('participantsInput').value);
       checkConflict();
       updateRecurPreview('david');
     });
@@ -2178,7 +2193,7 @@
       document.querySelectorAll('.dur-chip').forEach(function(c){ c.classList.remove('active'); });
     });
 
-    document.getElementById('locationSelect').addEventListener('change', function(){ updateTip(); checkConflict(); renderSlotSuggestions(document.getElementById('dateInput').value, this.value, 'david'); });
+    document.getElementById('locationSelect').addEventListener('change', function(){ updateTip(); checkConflict(); renderSlotSuggestions(document.getElementById('dateInput').value, this.value, 'david', document.getElementById('participantsInput').value); });
     document.getElementById('startInput').addEventListener('change', checkConflict);
     document.getElementById('endInput').addEventListener('change', checkConflict);
     document.getElementById('bookingForm').addEventListener('submit', handleSubmit);
@@ -2221,7 +2236,7 @@
         btn.classList.add('active');
         document.getElementById('participantsInput').value = btn.dataset.p;
         checkConflict();
-        renderSlotSuggestions(document.getElementById('dateInput').value, document.getElementById('locationSelect').value, 'david');
+        renderSlotSuggestions(document.getElementById('dateInput').value, document.getElementById('locationSelect').value, 'david', btn.dataset.p);
       });
     });
     document.getElementById('viewDayBtn').addEventListener('click', function(){ setCalendarView('day'); });
