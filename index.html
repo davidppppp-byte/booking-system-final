@@ -90,8 +90,10 @@
   .event-block.compact{display:flex;align-items:center;padding:0 9px;}
   .event-block.compact .ec{font-size:11px;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .timeline-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:13.5px;}
-  .block-band{position:absolute;left:0;width:8px;border-radius:0 4px 4px 0;background:repeating-linear-gradient(135deg,rgba(43,36,32,.9),rgba(43,36,32,.9) 4px,rgba(43,36,32,.65) 4px,rgba(43,36,32,.65) 8px);z-index:2;cursor:default;}
-  .block-label{display:none;}
+  .block-band{position:absolute;width:10px;border-radius:0 4px 4px 0;z-index:2;cursor:default;}
+  .block-band-david{left:0;background:repeating-linear-gradient(135deg,rgba(43,36,32,.92),rgba(43,36,32,.92) 4px,rgba(43,36,32,.6) 4px,rgba(43,36,32,.6) 8px);}
+  .block-band-yawas{left:11px;background:repeating-linear-gradient(135deg,rgba(59,110,165,.92),rgba(59,110,165,.92) 4px,rgba(59,110,165,.6) 4px,rgba(59,110,165,.6) 8px);}
+  .block-band-label{position:absolute;left:13px;top:4px;font-size:9.5px;font-weight:900;color:rgba(43,36,32,.5);font-family:var(--mono);letter-spacing:.05em;writing-mode:vertical-rl;text-orientation:mixed;line-height:10px;}
   .now-line{position:absolute;left:0;right:0;border-top:2px solid #D9534F;z-index:5;}
 
   /* ── 常用時長快速鍵 ── */
@@ -1518,8 +1520,11 @@
       rows.push({ icon:'👤', label:'申請人', val: ev.applicant });
       if(ev.notes) rows.push({ icon:'📝', label:'備註', val: ev.notes });
     } else if(ev.type==='block'){
-      rows.push({ icon:'🚫', label:'說明', val: 'David 此時段無法安排會議' });
+      var whoBlocked = ev.blockedFor==='yawas' ? 'Yawas' : 'David';
+      rows.push({ icon:'🚫', label:'封鎖者', val: whoBlocked + ' 此時段無法安排會議' });
     } else {
+      var managerLabel = ev.participants==='both' ? 'David & Yawas' : ev.participants==='yawas' ? 'Yawas' : 'David';
+      rows.push({ icon:'👔', label:'出席主管', val: managerLabel });
       rows.push({ icon:'👤', label:'預約人', val: ev.applicant });
       if(ev.attendees) rows.push({ icon:'👥', label:'與會人', val: ev.attendees });
     }
@@ -1664,15 +1669,16 @@
 
     blockEvents.forEach(function(ev){
       var bStartMin = timeToMinutes(ev.start) - DAY_START*60;
-      var bEndMin = timeToMinutes(ev.end) - DAY_START*60;
-      var bTop = (bStartMin/60) * HOUR_HEIGHT;
+      var bEndMin   = timeToMinutes(ev.end)   - DAY_START*60;
+      var bTop    = (bStartMin/60) * HOUR_HEIGHT;
       var bHeight = Math.max(((bEndMin-bStartMin)/60) * HOUR_HEIGHT, 30);
+      var isYawas = ev.blockedFor === 'yawas';
 
       var band = document.createElement('div');
-      band.className = 'block-band';
-      band.style.top = bTop + 'px';
+      band.className = 'block-band ' + (isYawas ? 'block-band-yawas' : 'block-band-david');
+      band.style.top    = bTop + 'px';
       band.style.height = bHeight + 'px';
-      band.title = '🚫 ' + (ev.blockedFor==='yawas'?'Yawas':'David') + ' ' + ev.start + '–' + ev.end + '　' + ev.subject;
+      band.title = '🚫 ' + (isYawas ? 'Yawas' : 'David') + ' ' + ev.start + '–' + ev.end + '　' + ev.subject;
       grid.appendChild(band);
     });
 
