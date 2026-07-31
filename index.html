@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
-<title>會議預約系統</title>
+<title>David 會議預約系統</title>
 <style>
   :root{
     --bg:#F7F4EE;
@@ -277,7 +277,7 @@
   <div class="container">
     <header class="top">
       <p class="eyebrow">蒙恩聽障烘焙坊 · 北屯總部預約系統</p>
-      <h1>會議室 & 主管行程預約</h1>
+      <h1>會議室 & David 行程預約</h1>
       <p class="sub">跟 David 約時間，或單獨預約北屯總部會議室，送出後即時顯示在行事曆。</p>
     </header>
 
@@ -1248,19 +1248,34 @@
     var persons = participants || 'david';
     var checkDavid = persons==='david' || persons==='both';
     var checkYawas = persons==='yawas' || persons==='both';
+
+    // 只有這四間會議室才互相擋（跨類型也擋）
+    var MEETING_ROOMS = ['小會議室','大會議室','洽談室Ａ','洽談室Ｂ'];
+    var isMeetingRoom = location && MEETING_ROOMS.indexOf(location) > -1;
+
     return list.find(function(b){
       if(b.status!=='approved' || b.date!==date || b.id===excludeId) return false;
       var overlap = timeToMinutes(b.start) < e && s < timeToMinutes(b.end);
       if(!overlap) return false;
+
+      // 會議室預約 mode：只看同一間是否被佔用（不管 block）
       if(mode==='room'){
         if(b.type==='block') return false;
         return b.location===location;
       }
+
+      // 個人行程 mode：
+      // 1) 同一間四大會議室被任何已通過的預約（含室預約、個人行程）佔用就擋住
+      if(isMeetingRoom && b.type!=='block' && b.location===location) return true;
+
+      // 2) 封鎖時段
       if(b.type==='block'){
         if(checkDavid && b.blockedFor==='david') return true;
         if(checkYawas && b.blockedFor==='yawas') return true;
         return false;
       }
+
+      // 3) 個人時間衝突（同一位主管有其他行程）
       if(b.bookingMode!=='david') return false;
       var bD = b.participants==='david'||b.participants==='both';
       var bY = b.participants==='yawas'||b.participants==='both';
@@ -1275,8 +1290,13 @@
       var who = conflict.blockedFor==='yawas' ? 'Yawas' : 'David';
       return who+' 這個時段無法安排會議（'+conflict.subject+'），請更換時間。';
     }
-    if(conflict.bookingMode==='room'){
-      return '此時段「'+location+'」已被《'+conflict.subject+'》（'+conflict.applicant+'，'+conflict.start+'–'+conflict.end+'）預約，請更換時間或地點。';
+    // 同一間四大會議室被佔用（不論是哪種預約類型）
+    if(conflict.location===location){
+      var byWhom = conflict.bookingMode==='room'
+        ? '（'+conflict.applicant+'・'+conflict.department+'）的會議室預約'
+        : '（'+(conflict.participants==='yawas'?'Yawas':conflict.participants==='both'?'David / Yawas':'David')+'）的行程';
+      return '此時段「'+location+'」已被《'+conflict.subject+'》'+byWhom+
+        '（'+conflict.start+'–'+conflict.end+'）佔用，請更換時間或地點。';
     }
     var who = conflict.participants==='yawas'?'Yawas':conflict.participants==='both'?'David / Yawas':'David';
     return who+' 這個時段已有會議《'+conflict.subject+'》（'+conflict.start+'–'+conflict.end+'），請更換時間。';
@@ -1881,11 +1901,23 @@
         approvalHtml = '<div class="approval-status">'+chip('David',b.approverDavid)+chip('Yawas',b.approverYawas)+'</div>';
       }
 
+      // Check if approving this booking would conflict with already-approved bookings
+      var approvalConflict = null;
+      if(adminTab === 'pending'){
+        approvalConflict = findConflict(
+          bookings.filter(function(x){ return x.id !== b.id; }),
+          b.date, b.location, b.start, b.end, null, 'david', b.participants
+        );
+      }
+
       // Action buttons: pending tab shows approve/reject; already-actioned shows status
       var myApprover = me==='yawas' ? b.approverYawas : b.approverDavid;
       var actionsHtml = '';
       if(adminTab === 'pending'){
-        if(myApprover === null || myApprover === undefined){
+        if(approvalConflict){
+          actionsHtml += '<div style="font-size:11.5px;color:var(--danger);font-weight:700;line-height:1.4;max-width:160px;">⚠ 時段衝突<br><small style="font-weight:400;">'+escapeHtml(conflictMessage(approvalConflict, b.location))+'</small></div>';
+          actionsHtml += '<button class="action-btn reject" data-action="reject">拒絕</button>';
+        } else if(myApprover === null || myApprover === undefined){
           actionsHtml += '<button class="action-btn approve" data-action="approve">通過</button>';
           actionsHtml += '<button class="action-btn reject" data-action="reject">拒絕</button>';
         } else {
@@ -1941,6 +1973,19 @@
     loadBookings().then(function(fresh){
       var b = fresh.find(function(x){ return x.id===id; });
       if(!b) return;
+
+      // 審核通過前再做一次即時衝突確認（防止審核中有人搶先預約）
+      if(decision === 'approve'){
+        var conflict = findConflict(
+          fresh.filter(function(x){ return x.id !== id; }),
+          b.date, b.location, b.start, b.end, null, 'david', b.participants
+        );
+        if(conflict){
+          alert('⚠ 無法通過：' + conflictMessage(conflict, b.location) + '\n\n請告知申請人更換時間或地點，或直接拒絕這筆申請。');
+          return refreshData(); // 重新整理列表顯示最新衝突狀況
+        }
+      }
+
       var me = currentAdmin || 'david';
       var fields = {};
       if(me==='yawas') fields.approver_yawas = decision==='approve';
