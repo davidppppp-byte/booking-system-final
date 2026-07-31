@@ -1676,53 +1676,83 @@
       grid.appendChild(band);
     });
 
-    var cols = [];
-    dayEvents.forEach(function(ev){
-      var placed = false;
-      for(var c=0;c<cols.length;c++){
-        var last = cols[c][cols[c].length-1];
-        if(timeToMinutes(last.end) <= timeToMinutes(ev.start)){ cols[c].push(ev); ev._col = c; placed = true; break; }
-      }
-      if(!placed){ cols.push([ev]); ev._col = cols.length-1; }
-    });
-    var totalCols = Math.max(cols.length, 1);
+    // Split into two independent tracks
+    var personalEvents = dayEvents.filter(function(ev){ return ev.bookingMode !== 'room'; });
+    var roomEventsDay  = dayEvents.filter(function(ev){ return ev.bookingMode === 'room'; });
 
-    dayEvents.forEach(function(ev){
-      var startMin = timeToMinutes(ev.start) - DAY_START*60;
-      var endMin = timeToMinutes(ev.end) - DAY_START*60;
-      var top = (startMin/60) * HOUR_HEIGHT;
-      var height = Math.max(((endMin-startMin)/60) * HOUR_HEIGHT, 20);
-      var widthPct = 100/totalCols;
-      var leftPct = ev._col * widthPct;
+    // Lane-pack each track independently
+    function packLanes(events){
+      var cols = [];
+      events.forEach(function(ev){
+        var placed = false;
+        for(var c=0;c<cols.length;c++){
+          var last = cols[c][cols[c].length-1];
+          if(timeToMinutes(last.end) <= timeToMinutes(ev.start)){ cols[c].push(ev); ev._col=c; placed=true; break; }
+        }
+        if(!placed){ cols.push([ev]); ev._col=cols.length-1; }
+      });
+      return Math.max(cols.length, 1);
+    }
 
-      var block = document.createElement('div');
-      block.className = 'event-block' + (ev.bookingMode==='room' ? ' room-booking' : '');
-      block.style.top = top + 'px';
-      block.style.height = height + 'px';
-      block.style.left = 'calc(' + leftPct + '% + 4px)';
-      block.style.width = 'calc(' + widthPct + '% - 8px)';
-      block.style.background = ev.bookingMode==='room' ? ROOM_COLOR
-        : ev.participants==='yawas' ? YAWAS_COLOR
-        : ev.participants==='both'  ? BOTH_PERSON_COLOR
-        : locationInfo(ev.location).color;
-      block.style.zIndex = '3';
-      block.title = ev.start+'–'+ev.end+' '+ev.subject+'／'+ev.location+'／'+(ev.bookingMode==='room'?ev.applicant+' ('+ev.department+')':ev.applicant);
-      var prefix = ev.bookingMode==='room' ? '🏢 ' : '';
+    var personalCols = packLanes(personalEvents);
+    var roomCols     = packLanes(roomEventsDay);
 
-      if(height >= 54){
-        block.innerHTML = '<div class="et">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
-          '<div class="es">'+prefix+escapeHtml(ev.subject)+'</div>' +
-          '<div class="em">'+escapeHtml(ev.location)+' · '+(ev.bookingMode==='room'?escapeHtml(ev.department||ev.applicant):escapeHtml(ev.applicant))+'</div>';
-      } else if(height >= 38){
-        block.innerHTML = '<div class="et">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
-          '<div class="es">'+prefix+escapeHtml(ev.subject)+'</div>';
-      } else {
-        block.classList.add('compact');
-        block.innerHTML = '<div class="ec">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'　'+prefix+escapeHtml(ev.subject)+'</div>';
-      }
-      grid.appendChild(block);
-      (function(evData){ block.addEventListener('click', function(e){ e.stopPropagation(); showEventPopup(evData, e.clientX, e.clientY); }); })(ev);
-    });
+    // Left track: 60% for personal, Right track: 40% for rooms
+    // If only one type exists, it takes the full width
+    var hasPersonal = personalEvents.length > 0;
+    var hasRoom     = roomEventsDay.length > 0;
+    var personalWidth = (hasPersonal && hasRoom) ? 60 : 100;
+    var roomWidth     = (hasPersonal && hasRoom) ? 40 : 100;
+    var roomOffset    = (hasPersonal && hasRoom) ? 60 : 0;
+
+    // Add a subtle divider if both tracks are active
+    if(hasPersonal && hasRoom){
+      var divider = document.createElement('div');
+      divider.style.cssText = 'position:absolute;top:0;bottom:0;left:'+roomOffset+'%;width:1px;background:var(--border);z-index:1;';
+      grid.appendChild(divider);
+    }
+
+    function renderTrack(events, trackCols, trackOffsetPct, trackWidthPct){
+      events.forEach(function(ev){
+        var startMin = timeToMinutes(ev.start) - DAY_START*60;
+        var endMin   = timeToMinutes(ev.end)   - DAY_START*60;
+        var top    = (startMin/60) * HOUR_HEIGHT;
+        var height = Math.max(((endMin-startMin)/60) * HOUR_HEIGHT, 20);
+        var colWidthPct = trackWidthPct / trackCols;
+        var leftPct     = trackOffsetPct + ev._col * colWidthPct;
+
+        var block = document.createElement('div');
+        block.className = 'event-block' + (ev.bookingMode==='room' ? ' room-booking' : '');
+        block.style.top    = top + 'px';
+        block.style.height = height + 'px';
+        block.style.left   = 'calc(' + leftPct + '% + 4px)';
+        block.style.width  = 'calc(' + colWidthPct + '% - 8px)';
+        block.style.background = ev.bookingMode==='room' ? ROOM_COLOR
+          : ev.participants==='yawas' ? YAWAS_COLOR
+          : ev.participants==='both'  ? BOTH_PERSON_COLOR
+          : locationInfo(ev.location).color;
+        block.style.zIndex = '3';
+        block.title = ev.start+'–'+ev.end+' '+ev.subject+'／'+ev.location+'／'+(ev.bookingMode==='room'?ev.applicant+' ('+ev.department+')':ev.applicant);
+        var prefix = ev.bookingMode==='room' ? '🏢 ' : '';
+
+        if(height >= 54){
+          block.innerHTML = '<div class="et">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
+            '<div class="es">'+prefix+escapeHtml(ev.subject)+'</div>' +
+            '<div class="em">'+escapeHtml(ev.location)+' · '+(ev.bookingMode==='room'?escapeHtml(ev.department||ev.applicant):escapeHtml(ev.applicant))+'</div>';
+        } else if(height >= 38){
+          block.innerHTML = '<div class="et">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'</div>' +
+            '<div class="es">'+prefix+escapeHtml(ev.subject)+'</div>';
+        } else {
+          block.classList.add('compact');
+          block.innerHTML = '<div class="ec">'+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'　'+prefix+escapeHtml(ev.subject)+'</div>';
+        }
+        grid.appendChild(block);
+        (function(evData){ block.addEventListener('click', function(e){ e.stopPropagation(); showEventPopup(evData, e.clientX, e.clientY); }); })(ev);
+      });
+    }
+
+    renderTrack(personalEvents, personalCols, 0,           personalWidth);
+    renderTrack(roomEventsDay,  roomCols,     roomOffset,  roomWidth);
 
     renderNowLine(grid);
   }
