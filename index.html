@@ -90,8 +90,8 @@
   .event-block.compact{display:flex;align-items:center;padding:0 9px;}
   .event-block.compact .ec{font-size:11px;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .timeline-empty-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:13.5px;}
-  .block-band{position:absolute;left:4px;width:200px;border-radius:8px;background:repeating-linear-gradient(135deg,rgba(43,36,32,.82),rgba(43,36,32,.82) 8px,rgba(43,36,32,.68) 8px,rgba(43,36,32,.68) 16px);display:flex;align-items:flex-start;padding:7px 10px;overflow:hidden;z-index:2;}
-  .block-label{color:#fff;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .block-band{position:absolute;left:0;width:8px;border-radius:0 4px 4px 0;background:repeating-linear-gradient(135deg,rgba(43,36,32,.9),rgba(43,36,32,.9) 4px,rgba(43,36,32,.65) 4px,rgba(43,36,32,.65) 8px);z-index:2;cursor:default;}
+  .block-label{display:none;}
   .now-line{position:absolute;left:0;right:0;border-top:2px solid #D9534F;z-index:5;}
 
   /* ── 常用時長快速鍵 ── */
@@ -1670,10 +1670,9 @@
 
       var band = document.createElement('div');
       band.className = 'block-band';
-      band.style.top = (bTop + 4) + 'px';
-      band.style.height = Math.max(bHeight - 8, 22) + 'px';
-      band.title = ev.start+'–'+ev.end+' '+ev.subject;
-      band.innerHTML = '<span class="block-label">🚫 '+escapeHtml(ev.start)+'–'+escapeHtml(ev.end)+'　'+escapeHtml(ev.subject)+'</span>';
+      band.style.top = bTop + 'px';
+      band.style.height = bHeight + 'px';
+      band.title = '🚫 ' + (ev.blockedFor==='yawas'?'Yawas':'David') + ' ' + ev.start + '–' + ev.end + '　' + ev.subject;
       grid.appendChild(band);
     });
 
