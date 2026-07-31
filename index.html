@@ -584,10 +584,19 @@
     </div>
 
     <div id="adminAddFormCard" class="card hidden" style="margin-bottom:18px;">
-      <p style="margin:0 0 14px;font-size:13.5px;color:var(--ink-soft);">直接幫同仁建立一筆「已通過」的會議，適合口頭或 LINE 口頭約定的情況。</p>
+      <p style="margin:0 0 14px;font-size:13.5px;color:var(--ink-soft);">直接建立一筆「已通過」的會議，適合口頭或 LINE 口頭約定的情況。</p>
       <div class="form-grid">
+        <div class="field full">
+          <label>此行程屬於<span class="req">*</span></label>
+          <div class="participants-row" id="adminAddParticipantsRow">
+            <button type="button" class="participant-btn" data-p="david">🤝 David</button>
+            <button type="button" class="participant-btn" data-p="yawas">👔 Yawas</button>
+            <button type="button" class="participant-btn" data-p="both">👥 兩位都有</button>
+          </div>
+          <input type="hidden" id="adminAddParticipants" value="david">
+        </div>
         <div class="field">
-          <label for="adminAddApplicant">預約人<span class="req">*</span></label>
+          <label for="adminAddApplicant">對方（預約人）<span class="req">*</span></label>
           <input type="text" id="adminAddApplicant" placeholder="必填">
         </div>
         <div class="field">
@@ -1746,6 +1755,12 @@
     document.getElementById('mainView').classList.add('hidden');
     document.getElementById('adminPanel').classList.remove('hidden');
     document.getElementById('adminPanelTitle').textContent = (currentAdmin==='yawas'?'Yawas':'David')+' 管理後台';
+    // Pre-select the logged-in person's participants button
+    var me = currentAdmin || 'david';
+    document.getElementById('adminAddParticipants').value = me;
+    document.querySelectorAll('#adminAddParticipantsRow .participant-btn').forEach(function(b){
+      b.classList.toggle('active', b.dataset.p === me);
+    });
     adminTab = 'pending';
     renderAdminTabs();
     renderAdminList();
@@ -1983,7 +1998,8 @@
     }
     msg.classList.add('hidden');
 
-    var conflict = findConflict(bookings, date, location, start, end, null, 'david');
+    var participants = document.getElementById('adminAddParticipants').value || currentAdmin || 'david';
+    var conflict = findConflict(bookings, date, location, start, end, null, 'david', participants);
     if(conflict){
       msg.textContent = '提醒：此時段有衝突（' + conflict.subject + '），仍可繼續新增，請確認是否繼續？';
       msg.classList.remove('hidden');
@@ -1992,7 +2008,10 @@
     insertBooking({
       applicant: applicant, attendees: attendees, date: date,
       location: location, start: start, end: end, subject: subject,
-      status: 'approved', type: 'meeting'
+      status: 'approved', type: 'meeting',
+      participants: participants,
+      approverDavid: participants==='yawas' ? null : true,
+      approverYawas: participants==='david' ? null : true
     }).then(function(){
       ['adminAddApplicant','adminAddAttendees','adminAddSubject'].forEach(function(id){
         document.getElementById(id).value='';
@@ -2233,6 +2252,13 @@
     document.getElementById('adminList').addEventListener('click', handleAdminListClick);
     document.getElementById('addBlockBtn').addEventListener('click', handleAddBlock);
     document.getElementById('adminAddSubmitBtn').addEventListener('click', handleAdminAddBooking);
+    document.querySelectorAll('#adminAddParticipantsRow .participant-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('#adminAddParticipantsRow .participant-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        document.getElementById('adminAddParticipants').value = btn.dataset.p;
+      });
+    });
 
     loadBookings().then(function(fresh){
       bookings = fresh;
