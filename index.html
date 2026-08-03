@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
-<title>會議預約系統</title>
+<title>會議室 & 主管行程預約</title>
 <style>
   :root{
     --bg:#F7F4EE;
@@ -218,6 +218,22 @@
 
   footer.bottom{text-align:center;padding:36px 0 10px;font-size:12.5px;color:var(--ink-faint);}
   .admin-link{color:var(--ink-soft);text-decoration:underline;background:none;border:none;font-size:12.5px;padding:0;}
+  /* ── 本週會議室使用率 ── */
+  .usage-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:4px;}
+  @media(max-width:680px){.usage-grid{grid-template-columns:repeat(2,1fr);}}
+  .usage-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 14px 10px;}
+  .usage-room{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;}
+  .usage-bar-wrap{height:6px;background:#EFEAE0;border-radius:3px;margin-bottom:7px;overflow:hidden;}
+  .usage-bar{height:100%;border-radius:3px;transition:width .4s;}
+  .usage-stats{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-soft);}
+  .usage-hot{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:8px;background:#FBF1DC;color:#B8862B;}
+  .usage-detail{margin-top:16px;}
+  .usage-detail-title{font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;}
+  .peak-chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .peak-chip{padding:4px 10px;border-radius:8px;font-size:12px;font-family:var(--mono);background:var(--grayLt,#F0EDEA);color:var(--ink-soft);}
+  .peak-chip.peak-high{background:#FBF1DC;color:#B8862B;font-weight:700;}
+
+  .pending-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;background:var(--danger);color:#fff;border-radius:9px;font-size:10.5px;font-weight:700;margin-left:5px;vertical-align:middle;}
 
   .modal-overlay{position:fixed;inset:0;background:rgba(43,36,32,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
   .modal{background:#fff;border-radius:16px;padding:28px 26px;max-width:360px;width:100%;text-align:center;box-shadow:0 14px 44px rgba(0,0,0,.22);}
@@ -277,7 +293,7 @@
   <div class="container">
     <header class="top">
       <p class="eyebrow">蒙恩聽障烘焙坊 · 北屯總部預約系統</p>
-      <h1>會議室 & 主管行程預約</h1>
+      <h1>會議室 & David 行程預約</h1>
       <p class="sub">跟 David 約時間，或單獨預約北屯總部會議室，送出後即時顯示在行事曆。</p>
     </header>
 
@@ -510,6 +526,18 @@
     </div>
 
     <div class="section-heading">
+      <h2>本週會議室使用率</h2>
+      <span class="hint" id="usageWeekLabel"></span>
+    </div>
+    <div class="card" style="margin-bottom:0;">
+      <div class="usage-grid" id="usageGrid"></div>
+      <div class="usage-detail">
+        <div class="usage-detail-title">最忙時段</div>
+        <div class="peak-chips" id="peakChips"></div>
+      </div>
+    </div>
+
+    <div class="section-heading">
       <h2>會議行事曆</h2>
       <span class="hint">顯示已核准的 David 行程與會議室預約</span>
     </div>
@@ -548,7 +576,7 @@
     </div>
 
     <footer class="bottom">
-      <p>蒙恩聽障烘焙坊・內部使用　·　<button type="button" class="admin-link" id="adminLinkBtn">管理者登入</button></p>
+      <p>蒙恩聽障烘焙坊・內部使用　·　<button type="button" class="admin-link" id="adminLinkBtn">管理者登入<span id="pendingBadge" class="pending-badge hidden"></span></button></p>
     </footer>
   </div><!-- end mainView -->
 
@@ -1447,28 +1475,32 @@
         box.innerHTML = '<div class="empty-list">查無「'+escapeHtml(name)+'」的預約紀錄，請確認姓名是否與送出申請時一致</div>';
         return;
       }
-      box.innerHTML = mine.map(function(b){
-        var note = b.status==='rejected' ? '<div class="rejected-note">已婉拒，如有疑問請洽 David</div>' : '';
 
-        // 可取消條件：David 預約且待審核，或會議室預約且尚未開始
+      // Build rows
+      box.innerHTML = mine.map(function(b){
+        var note = b.status==='rejected' ? '<div class="rejected-note">已婉拒，如有疑問請洽主管</div>' : '';
+        var isFuture = new Date(b.date+'T'+b.end+':00') > new Date();
+
+        // Bug 2 fix：已通過的個人預約，在開始前也可以自行取消
         var canCancel = false;
         var cancelLabel = '取消預約';
+        var cancelStyle = '';
         if(b.bookingMode === 'david' && b.status === 'pending'){
           canCancel = true;
-        } else if(b.bookingMode === 'room'){
-          // 若會議日期時間還沒到，可以取消
-          var meetingStart = new Date(b.date + 'T' + b.start + ':00');
-          if(meetingStart > new Date()){
-            canCancel = true;
-            cancelLabel = '取消會議室';
-          }
+        } else if(b.bookingMode === 'david' && b.status === 'approved' && isFuture){
+          canCancel = true;
+          cancelLabel = '取消已通過的預約';
+          cancelStyle = 'background:#fff2f2;border-color:var(--danger);';
+        } else if(b.bookingMode === 'room' && isFuture){
+          canCancel = true;
+          cancelLabel = '取消會議室';
         }
 
         var modeTag = b.bookingMode === 'room'
           ? '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:#EAF0EE;color:#3E6E66;font-size:11px;font-weight:700;margin-left:6px;">🏢 會議室</span>'
           : '';
         var cancelBtn = canCancel
-          ? '<button class="cancel-booking-btn" data-cancel-id="'+escapeHtml(b.id)+'" data-cancel-mode="'+escapeHtml(b.bookingMode)+'">'+cancelLabel+'</button>'
+          ? '<button class="cancel-booking-btn" style="'+cancelStyle+'" data-cancel-id="'+escapeHtml(b.id)+'" data-cancel-mode="'+escapeHtml(b.bookingMode)+'" data-cancel-status="'+escapeHtml(b.status)+'">'+cancelLabel+'</button>'
           : '';
 
         return '<div class="booking-row">' +
@@ -1484,24 +1516,33 @@
         '</div>';
       }).join('');
 
-      box.addEventListener('click', function(e){
-        var btn = e.target.closest('.cancel-booking-btn');
-        if(!btn) return;
-        var mode = btn.dataset.cancelMode;
-        var confirmMsg = mode === 'room'
-          ? '確定要取消這筆會議室預約嗎？取消後該時段將立即釋出。'
-          : '確定要取消這筆預約申請嗎？';
-        if(!confirm(confirmMsg)) return;
-        var id = btn.dataset.cancelId;
-        deleteBookingRow(id).then(function(){
-          return refreshData();
-        }).then(function(){
-          handleLookup();
-        }).catch(function(err){
-          console.error('取消失敗', err);
-          alert('取消失敗，請確認網路連線後再試一次');
+      // Bug 1 fix：用事件委派取代 {once:true}，直接綁在每個按鈕上
+      box.querySelectorAll('.cancel-booking-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var mode   = btn.dataset.cancelMode;
+          var status = btn.dataset.cancelStatus;
+          var confirmMsg = mode === 'room'
+            ? '確定要取消這筆會議室預約嗎？取消後該時段將立即釋出。'
+            : status === 'approved'
+              ? '這筆預約已通過，確定要取消嗎？行事曆上的會議也會一併移除。'
+              : '確定要取消這筆預約申請嗎？';
+          if(!confirm(confirmMsg)) return;
+          var id = btn.dataset.cancelId;
+          btn.disabled = true;
+          btn.textContent = '取消中…';
+          deleteBookingRow(id).then(function(){
+            return refreshData();
+          }).then(function(){
+            handleLookup();
+          }).catch(function(err){
+            console.error('取消失敗', err);
+            alert('取消失敗，請確認網路連線後再試一次');
+            btn.disabled = false;
+            btn.textContent = cancelLabel;
+          });
         });
-      }, {once: true});
+      });
+
     }).catch(function(err){
       console.error('查詢失敗', err);
       box.innerHTML = '<div class="empty-list">查詢失敗，請確認網路連線後再試一次</div>';
@@ -2163,13 +2204,104 @@
     });
   }
 
+  // ---------- room usage dashboard ----------
+  function renderUsageDashboard(){
+    var ROOMS = ['小會議室','大會議室','洽談室Ａ','洽談室Ｂ'];
+    var ROOM_COLORS = {'小會議室':'#C17F3B','大會議室':'#3E6E66','洽談室Ａ':'#A85C66','洽談室Ｂ':'#7C5C8C'};
+    var WORK_HOURS = DAY_END - DAY_START; // 9h per day
+    var WORK_DAYS  = 5;
+    var MAX_MINS   = WORK_HOURS * 60 * WORK_DAYS; // 2700 min/week
+
+    // Current week Mon–Fri
+    var wStart = weekStartOf(todayStr());
+    var weekDays = [];
+    for(var i=0;i<WORK_DAYS;i++) weekDays.push(addDays(wStart, i));
+
+    // Label
+    var ws = new Date(wStart+'T00:00:00');
+    var we = new Date(addDays(wStart,4)+'T00:00:00');
+    var label = (ws.getMonth()+1)+'/'+ws.getDate()+' – '+(we.getMonth()+1)+'/'+we.getDate();
+    var labelEl = document.getElementById('usageWeekLabel');
+    if(labelEl) labelEl.textContent = label;
+
+    // Compute booked minutes per room this week
+    var roomMins = {};
+    ROOMS.forEach(function(r){ roomMins[r] = 0; });
+
+    bookings.forEach(function(b){
+      if(b.status !== 'approved') return;
+      if(b.type === 'block') return;
+      if(weekDays.indexOf(b.date) === -1) return;
+      if(ROOMS.indexOf(b.location) === -1) return;
+      var dur = timeToMinutes(b.end) - timeToMinutes(b.start);
+      roomMins[b.location] = (roomMins[b.location] || 0) + Math.max(0, dur);
+    });
+
+    // Find busiest room
+    var maxMins = Math.max.apply(null, ROOMS.map(function(r){ return roomMins[r]; }));
+
+    // Render room cards
+    var grid = document.getElementById('usageGrid');
+    if(!grid) return;
+    grid.innerHTML = '';
+
+    ROOMS.forEach(function(room){
+      var mins = roomMins[room] || 0;
+      var pct  = Math.min(100, Math.round(mins/MAX_MINS*100));
+      var hrs  = (mins/60).toFixed(1);
+      var isHot = mins === maxMins && maxMins > 0;
+      var barColor = pct >= 70 ? '#B5483D' : pct >= 40 ? '#B8862B' : ROOM_COLORS[room];
+      var card = document.createElement('div');
+      card.className = 'usage-card';
+      card.innerHTML =
+        '<div class="usage-room">'+escapeHtml(room)+(isHot?'<span class="usage-hot" style="float:right;">🔥 最熱</span>':'')+'</div>'+
+        '<div class="usage-bar-wrap"><div class="usage-bar" style="width:'+pct+'%;background:'+barColor+';"></div></div>'+
+        '<div class="usage-stats"><span>'+hrs+' 小時</span><span style="font-weight:700;color:'+(pct>=70?'var(--danger)':pct>=40?'var(--pending)':'var(--ink-soft)')+'">'+pct+'%</span></div>';
+      grid.appendChild(card);
+    });
+
+    // Peak hours: count bookings per hour slot across all 4 rooms this week
+    var hourCounts = {};
+    for(var h=DAY_START;h<DAY_END;h++) hourCounts[h]=0;
+    bookings.forEach(function(b){
+      if(b.status!=='approved'||b.type==='block') return;
+      if(weekDays.indexOf(b.date)===-1) return;
+      if(ROOMS.indexOf(b.location)===-1) return;
+      var s=timeToMinutes(b.start), e=timeToMinutes(b.end);
+      for(var h=DAY_START;h<DAY_END;h++){
+        if(s < (h+1)*60 && e > h*60) hourCounts[h]++;
+      }
+    });
+    var maxCount = Math.max.apply(null, Object.values ? Object.values(hourCounts) : Object.keys(hourCounts).map(function(k){ return hourCounts[k]; }));
+    var peakEl = document.getElementById('peakChips');
+    if(!peakEl) return;
+    if(maxCount === 0){
+      peakEl.innerHTML = '<span class="peak-chip">本週尚無預約</span>';
+      return;
+    }
+    peakEl.innerHTML = Object.keys(hourCounts).sort(function(a,b){return a-b;}).map(function(h){
+      var cnt = hourCounts[h];
+      var isPeak = cnt === maxCount && cnt > 0;
+      var label = pad(parseInt(h))+':00–'+pad(parseInt(h)+1)+':00';
+      return '<span class="peak-chip'+(isPeak?' peak-high':'')+'">'+label+(cnt>0?' ('+cnt+')':'')+'</span>';
+    }).filter(function(s){ return s.indexOf('(0)') === -1 && s.indexOf('()') === -1; }).join('');
+  }
+
   // ---------- refresh ----------
   function refreshData(){
     return loadBookings().then(function(fresh){
       bookings = fresh;
       renderDayStrip();
       renderTimeline();
+      renderUsageDashboard();
       if(isAdmin) renderAdminList();
+      // Update pending badge
+      var pendingCount = fresh.filter(function(b){ return b.status==='pending' && b.type!=='block'; }).length;
+      var badge = document.getElementById('pendingBadge');
+      if(badge){
+        badge.textContent = pendingCount;
+        badge.classList.toggle('hidden', pendingCount === 0);
+      }
     });
   }
 
