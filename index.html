@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
-<title>會議室 & 主管行程預約</title>
+<title>David 會議預約系統</title>
 <style>
   :root{
     --bg:#F7F4EE;
@@ -106,15 +106,16 @@
   .view-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-left:auto;}
   .vtog-btn{padding:6px 14px;background:#fff;border:none;font-size:13px;font-weight:600;color:var(--ink-soft);}
   .vtog-btn.active{background:var(--ink);color:#fff;}
-  .week-grid{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;}
-  .week-col{border-right:1px solid var(--border);min-height:320px;}
+  #weekView{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .week-grid{display:grid;grid-template-columns:repeat(7,minmax(140px,1fr));border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;min-width:700px;}
+  .week-col{border-right:1px solid var(--border);}
   .week-col:last-child{border-right:none;}
-  .week-col-head{padding:10px 6px 8px;text-align:center;border-bottom:1px solid var(--border);background:#FAFAF8;}
+  .week-col-head{padding:10px 6px 8px;text-align:center;border-bottom:1px solid var(--border);background:#FAFAF8;position:sticky;top:0;z-index:2;}
   .week-col-head.today{background:var(--ink);}
   .week-col-head.today .wch-dow,.week-col-head.today .wch-date{color:#fff;}
   .wch-dow{font-size:10.5px;color:var(--ink-soft);font-family:var(--mono);}
   .wch-date{font-size:15px;font-weight:700;margin-top:2px;font-family:var(--mono);color:var(--ink);}
-  .week-events{padding:6px 4px;display:flex;flex-direction:column;gap:4px;}
+  .week-events{padding:6px 4px;display:flex;flex-direction:column;gap:4px;max-height:420px;overflow-y:auto;}
   .week-chip{border-radius:6px;padding:4px 6px;color:#fff;font-size:11px;line-height:1.3;cursor:default;}
   .week-chip .wct{font-family:var(--mono);font-size:10px;opacity:.9;}
   .week-chip .wcs{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -210,6 +211,22 @@
   /* ── Yawas / Both 顏色 ── */
   :root{--yawas-color:#3B6EA5;--both-color:#7C5C8C;}
 
+
+  /* ── 行事曆訂閱 ── */
+  .subscribe-section{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 24px;margin-bottom:28px;}
+  .subscribe-title{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px;}
+  .subscribe-sub{font-size:13px;color:var(--ink-soft);margin-bottom:16px;}
+  .subscribe-rows{display:flex;flex-direction:column;gap:12px;}
+  .subscribe-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .subscribe-label{font-size:13.5px;font-weight:700;color:var(--ink);min-width:130px;}
+  .sub-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:12.5px;font-weight:600;color:var(--ink-soft);text-decoration:none;cursor:pointer;font-family:inherit;}
+  .sub-btn:hover{border-color:var(--accent);color:var(--accent-dark);}
+  .sub-btn.apple{border-color:#555;color:#333;}
+  .sub-btn.apple:hover{background:#f0f0f0;}
+  .sub-btn.google{border-color:#4285F4;color:#4285F4;}
+  .sub-btn.google:hover{background:#EEF3FD;}
+  .sub-btn.copy-btn{border-color:var(--border);}
+  .sub-btn.copy-btn.copied{border-color:var(--success);color:var(--success);}
   /* ── 快速登記 banner ── */
   .quickbook-banner{background:linear-gradient(135deg,#2B5C4B,#3E7A67);color:#fff;border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;}
   .quickbook-banner .qb-icon{font-size:28px;flex-shrink:0;}
@@ -523,6 +540,17 @@
         <button type="button" class="lookup-btn" id="lookupBtn">查詢</button>
       </div>
       <div id="lookupResults"></div>
+    </div>
+
+    <div class="section-heading">
+      <h2>訂閱行事曆</h2>
+      <span class="hint">加入 Apple / Google 行事曆，自動同步</span>
+    </div>
+
+    <div class="subscribe-section">
+      <div class="subscribe-title">📅 選擇要訂閱的行程</div>
+      <div class="subscribe-sub">訂閱後，Apple 行事曆約每幾小時自動同步；Google 行事曆點「手動重新整理」即可更新。</div>
+      <div class="subscribe-rows" id="subscribeRows"></div>
     </div>
 
     <div class="section-heading">
@@ -2204,6 +2232,44 @@
     });
   }
 
+  // ---------- calendar subscription ----------
+  var FUNC_BASE = 'https://jtvipramwuknjgxfjdlo.supabase.co/functions/v1/calendar';
+
+  function renderSubscribeSection(){
+    var rows = document.getElementById('subscribeRows');
+    if(!rows) return;
+    var options = [
+      { label:'🤝 David 行程', person:'david' },
+      { label:'👩 Yawas 行程', person:'yawas' },
+      { label:'👥 兩位主管行程', person:'all' },
+      { label:'🏢 會議室預約',  person:'room'  },
+    ];
+    rows.innerHTML = options.map(function(opt){
+      var httpsUrl  = FUNC_BASE + '?person=' + opt.person;
+      var webcalUrl = httpsUrl.replace('https://', 'webcal://');
+      var googleUrl = 'https://www.google.com/calendar/render?cid=' + encodeURIComponent(httpsUrl);
+      return '<div class="subscribe-row">' +
+        '<span class="subscribe-label">'+opt.label+'</span>' +
+        '<a href="'+webcalUrl+'" class="sub-btn apple">🍎 Apple 行事曆</a>' +
+        '<a href="'+googleUrl+'" target="_blank" class="sub-btn google">🗓 Google 行事曆</a>' +
+        '<button type="button" class="sub-btn copy-btn" data-url="'+httpsUrl+'">複製連結</button>' +
+      '</div>';
+    }).join('');
+
+    rows.querySelectorAll('.copy-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        navigator.clipboard.writeText(btn.dataset.url).then(function(){
+          var orig = btn.textContent;
+          btn.textContent = '✓ 已複製';
+          btn.classList.add('copied');
+          setTimeout(function(){ btn.textContent = orig; btn.classList.remove('copied'); }, 2000);
+        }).catch(function(){
+          prompt('請複製以下連結：', btn.dataset.url);
+        });
+      });
+    });
+  }
+
   // ---------- room usage dashboard ----------
   function renderUsageDashboard(){
     var ROOMS = ['小會議室','大會議室','洽談室Ａ','洽談室Ｂ'];
@@ -2491,6 +2557,8 @@
       bookings = fresh;
       renderDayStrip();
       renderTimeline();
+      renderUsageDashboard();
+      renderSubscribeSection();
       handleQuickBook();
       setInterval(refreshData, 20000);
     });
