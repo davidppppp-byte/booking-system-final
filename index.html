@@ -1122,26 +1122,49 @@
     });
   }
 
-  // ---------- COLINE 通知 ----------
-  var NOTIFY_FUNC = 'https://jtvipramwuknjgxfjdlo.supabase.co/functions/v1/notify';
+  // ---------- COLINE 通知（直接呼叫 API）----------
+  var COLINE_TOKEN   = '1795d9c2-4715-4cf3-9a54-719a6a1702a2';
+  var COLINE_API_URL = 'https://eim.mitake.com.tw/v3/open/messages';
+  var COLINE_USERS   = {
+    david: '071293a7-6716-4a04-85bc-32928e5187d8',
+    yawas: '433f48c3-a5c6-47f9-8f35-fcc209b0d3d3'
+  };
 
   function sendColineNotification(b){
-    fetch(NOTIFY_FUNC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        applicant:    b.applicant,
-        attendees:    b.attendees || '',
-        meeting_date: b.date,
-        start_time:   b.start,
-        end_time:     b.end,
-        location:     b.location,
-        subject:      b.subject,
-        participants: b.participants || 'david',
-        booking_mode: b.bookingMode || 'david',
-      })
-    }).catch(function(err){
-      console.warn('COLINE 通知發送失敗（不影響預約流程）', err);
+    if(b.bookingMode !== 'david') return; // 純會議室不通知
+    var persons = b.participants || 'david';
+    var targets = [];
+    if(persons === 'david' || persons === 'both') targets.push('david');
+    if(persons === 'yawas' || persons === 'both') targets.push('yawas');
+    if(!targets.length) return;
+
+    var managerLine = persons === 'both'
+      ? '出席主管：David & Yawas（需兩位都通過）'
+      : persons === 'yawas' ? '出席主管：Yawas' : '出席主管：David';
+
+    var message = [
+      '📅 新會議預約申請', '',
+      '預約人：' + b.applicant,
+      b.attendees ? '與會人：' + b.attendees : null,
+      '日期：' + b.date,
+      '時間：' + b.start + '–' + b.end,
+      '地點：' + b.location,
+      '主題：' + b.subject,
+      managerLine, '',
+      '請登入後台審核 ✅'
+    ].filter(Boolean).join('\n');
+
+    targets.forEach(function(name){
+      fetch(COLINE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'token': COLINE_TOKEN },
+        body: JSON.stringify({
+          user_id: COLINE_USERS[name],
+          message: { type: 'text', content: message }
+        })
+      }).catch(function(err){
+        console.warn('COLINE 通知失敗（不影響預約流程）', err);
+      });
     });
   }
 
