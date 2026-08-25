@@ -231,8 +231,9 @@
   .sub-btn.copy-btn{border-color:var(--border);}
   .sub-btn.copy-btn.copied{border-color:var(--success);color:var(--success);}
   /* ── 本月排行榜 ── */
-  .lb-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;font-family:inherit;transition:all .15s;}
-  .lb-btn:hover{border-color:#C17F3B;color:#C17F3B;background:#FBF6EC;}
+  .lb-btn{display:inline-flex;align-items:center;gap:7px;padding:10px 22px;border-radius:24px;border:none;background:linear-gradient(135deg,#C17F3B,#E8A84A);color:#fff;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 3px 12px rgba(193,127,59,.4);letter-spacing:.01em;margin-top:10px;}
+  .lb-btn:hover{background:linear-gradient(135deg,#A86A28,#C17F3B);box-shadow:0 4px 16px rgba(193,127,59,.55);transform:translateY(-1px);}
+  .lb-btn:active{transform:translateY(0);}
   .lb-modal-overlay{position:fixed;inset:0;background:rgba(43,36,32,.5);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;}
   .lb-modal{background:#fff;border-radius:20px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
   .lb-header{background:linear-gradient(135deg,#2B2420,#52677A);padding:24px 22px 20px;border-radius:20px 20px 0 0;position:relative;}
@@ -1771,11 +1772,15 @@
       return;
     }
 
+    // 排除主管本人（不應出現在同仁排行榜）
+    var MANAGER_NAMES = ['David','Yawas','重恩','夢涵'];
+
     // --- 1. Top applicants (david-mode only) ---
     var davidBookings = mb.filter(function(b){ return b.bookingMode==='david'; });
     var personCount = {};
     davidBookings.forEach(function(b){
       var key = b.applicant || '（未填）';
+      if(MANAGER_NAMES.indexOf(key) > -1) return; // 主管不算
       personCount[key] = (personCount[key]||0) + 1;
     });
     var topPersons = Object.keys(personCount).sort(function(a,b){ return personCount[b]-personCount[a]; }).slice(0,5);
