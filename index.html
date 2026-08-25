@@ -230,7 +230,37 @@
   .sub-btn.google:hover{background:#EEF3FD;}
   .sub-btn.copy-btn{border-color:var(--border);}
   .sub-btn.copy-btn.copied{border-color:var(--success);color:var(--success);}
-  /* ── 快速登記 banner ── */
+  /* ── 本月排行榜 ── */
+  .lb-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;font-family:inherit;transition:all .15s;}
+  .lb-btn:hover{border-color:#C17F3B;color:#C17F3B;background:#FBF6EC;}
+  .lb-modal-overlay{position:fixed;inset:0;background:rgba(43,36,32,.5);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .lb-modal{background:#fff;border-radius:20px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .lb-header{background:linear-gradient(135deg,#2B2420,#52677A);padding:24px 22px 20px;border-radius:20px 20px 0 0;position:relative;}
+  .lb-header h2{color:#fff;font-size:22px;margin:0 0 4px;}
+  .lb-header .lb-month{color:rgba(255,255,255,.65);font-size:13px;}
+  .lb-close{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .lb-close:hover{background:rgba(255,255,255,.35);}
+  .lb-body{padding:18px 20px 24px;}
+  .lb-section{margin-bottom:20px;}
+  .lb-section-title{font-size:12px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;}
+  .lb-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;margin-bottom:6px;background:var(--offwhite,#F7F4EE);}
+  .lb-rank{font-size:18px;width:28px;text-align:center;flex-shrink:0;}
+  .lb-info{flex:1;min-width:0;}
+  .lb-name{font-size:14px;font-weight:700;color:var(--ink);}
+  .lb-sub{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
+  .lb-count{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--ink);}
+  .lb-bar-wrap{height:5px;background:#EFEAE0;border-radius:3px;margin-top:5px;overflow:hidden;}
+  .lb-bar{height:100%;border-radius:3px;}
+  .lb-room-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);}
+  .lb-room-row:last-child{border-bottom:none;}
+  .lb-room-emoji{font-size:16px;width:22px;text-align:center;}
+  .lb-room-name{flex:1;font-size:13px;font-weight:600;color:var(--ink);}
+  .lb-room-bar{flex:2;height:8px;background:#EFEAE0;border-radius:4px;overflow:hidden;}
+  .lb-room-fill{height:100%;border-radius:4px;background:#3E6E66;}
+  .lb-room-count{font-size:12px;font-family:var(--mono);color:var(--ink-soft);min-width:30px;text-align:right;}
+  .lb-fun-box{background:linear-gradient(135deg,#FBF6EC,#EAF0EE);border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.7;color:var(--ink-soft);}
+  .lb-fun-box strong{color:var(--ink);}
+  .lb-empty{text-align:center;padding:40px 20px;color:var(--ink-faint);font-size:13.5px;}
   .quickbook-banner{background:linear-gradient(135deg,#2B5C4B,#3E7A67);color:#fff;border-radius:14px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;}
   .quickbook-banner .qb-icon{font-size:28px;flex-shrink:0;}
   .quickbook-banner .qb-title{font-size:15px;font-weight:700;}
@@ -315,6 +345,7 @@
       <p class="eyebrow">蒙恩聽障烘焙坊 · 北屯總部預約系統</p>
       <h1>會議室 & David 行程預約</h1>
       <p class="sub">跟 David 約時間，或單獨預約北屯總部會議室，送出後即時顯示在行事曆。</p>
+      <button type="button" class="lb-btn" id="lbOpenBtn">🏆 本月排行榜</button>
     </header>
 
     <div id="storageWarning" class="storage-warning hidden">⚠️ 尚未連接資料庫（Supabase），目前資料只會暫存在這個畫面中，重新整理後會消失、也不會與其他人同步。</div>
@@ -611,7 +642,17 @@
     </footer>
   </div><!-- end mainView -->
 
-  <!-- 色塊細節彈窗 -->
+  <!-- 本月排行榜 Modal -->
+  <div id="lbModal" class="lb-modal-overlay hidden">
+    <div class="lb-modal">
+      <div class="lb-header">
+        <h2>🏆 本月排行榜</h2>
+        <div class="lb-month" id="lbMonthLabel"></div>
+        <button type="button" class="lb-close" id="lbCloseBtn">✕</button>
+      </div>
+      <div class="lb-body" id="lbBody"></div>
+    </div>
+  </div>
   <div id="eventPopupOverlay" class="event-popup-overlay hidden"></div>
   <div id="eventPopup" class="event-popup hidden">
     <div class="event-popup-header" id="eventPopupHeader">
@@ -1694,6 +1735,130 @@
     popup.style.top  = top  + 'px';
   }
 
+  // ---------- leaderboard ----------
+  var FUNNY_RANKS = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+  var FUNNY_MSGS = [
+    ['預約達人！把主管的行事曆塞得密密麻麻 📅','一位難得的積極人才 💪','這份熱情讓主管感動（又有點緊張）😅'],
+    ['穩定輸出，按部就班的好同仁 🎯','不多不少，剛剛好的存在感 ✨','安靜但有力，默默推進中 🌿'],
+    ['努力追趕中，加油！🏃','潛力股，繼續衝！⚡','低調的實力派 🌙'],
+  ];
+  var ROOM_QUIPS = {
+    '小會議室': '永遠一位難求 🔥',
+    '大會議室': '大場面，大人物 👔',
+    '洽談室Ａ': '神秘的私密角落 🤫',
+    '洽談室Ｂ': '在努力存在感中... 😔'
+  };
+  var ZERO_MSG = ['最近有點低調呢 🌱','靜候佳音中... 🌙','默默耕耘，蓄勢待發 ⚡'];
+
+  function openLeaderboard(){
+    var now = new Date();
+    var yr = now.getFullYear(), mo = now.getMonth();
+    var monthStart = yr+'-'+pad(mo+1)+'-01';
+    var monthEnd   = yr+'-'+pad(mo+2)+'-01'; // next month
+    var monthLabel = yr+'年'+(mo+1)+'月';
+    document.getElementById('lbMonthLabel').textContent = monthLabel + ' 會議統計';
+
+    // Filter this month's approved, non-block bookings
+    var mb = bookings.filter(function(b){
+      return b.status==='approved' && b.type!=='block' && b.date>=monthStart && b.date<monthEnd;
+    });
+
+    var body = document.getElementById('lbBody');
+
+    if(!mb.length){
+      body.innerHTML = '<div class="lb-empty">本月還沒有任何已通過的預約 🌱<br>大家都在蓄勢待發！</div>';
+      document.getElementById('lbModal').classList.remove('hidden');
+      return;
+    }
+
+    // --- 1. Top applicants (david-mode only) ---
+    var davidBookings = mb.filter(function(b){ return b.bookingMode==='david'; });
+    var personCount = {};
+    davidBookings.forEach(function(b){
+      var key = b.applicant || '（未填）';
+      personCount[key] = (personCount[key]||0) + 1;
+    });
+    var topPersons = Object.keys(personCount).sort(function(a,b){ return personCount[b]-personCount[a]; }).slice(0,5);
+    var maxPC = topPersons.length ? personCount[topPersons[0]] : 1;
+
+    var personHTML = topPersons.length ? topPersons.map(function(name, i){
+      var cnt = personCount[name];
+      var funnyArr = FUNNY_MSGS[Math.min(i, FUNNY_MSGS.length-1)];
+      var funny = funnyArr[Math.floor(Math.random()*funnyArr.length)];
+      var barW = Math.round(cnt/maxPC*100);
+      return '<div class="lb-row">' +
+        '<div class="lb-rank">'+FUNNY_RANKS[i]+'</div>' +
+        '<div class="lb-info">' +
+          '<div class="lb-name">'+escapeHtml(name)+'</div>' +
+          '<div class="lb-sub">'+funny+'</div>' +
+          '<div class="lb-bar-wrap"><div class="lb-bar" style="width:'+barW+'%;background:#C17F3B;"></div></div>' +
+        '</div>' +
+        '<div class="lb-count">'+cnt+'場</div>' +
+      '</div>';
+    }).join('') : '<div class="lb-empty">本月沒有人跟主管預約 🌱</div>';
+
+    // --- 2. Manager popularity ---
+    var davidCnt = davidBookings.filter(function(b){ return b.participants==='david'||b.participants==='both'; }).length;
+    var yawasCnt = davidBookings.filter(function(b){ return b.participants==='yawas'||b.participants==='both'; }).length;
+    var maxMgr = Math.max(davidCnt, yawasCnt, 1);
+    var mgrHTML =
+      '<div class="lb-row">' +
+        '<div class="lb-rank">🤝</div>' +
+        '<div class="lb-info"><div class="lb-name">David</div>' +
+          '<div class="lb-bar-wrap"><div class="lb-bar" style="width:'+Math.round(davidCnt/maxMgr*100)+'%;background:#C17F3B;"></div></div></div>' +
+        '<div class="lb-count">'+davidCnt+'場</div>' +
+      '</div>' +
+      '<div class="lb-row">' +
+        '<div class="lb-rank">👩</div>' +
+        '<div class="lb-info"><div class="lb-name">Yawas</div>' +
+          '<div class="lb-bar-wrap"><div class="lb-bar" style="width:'+Math.round(yawasCnt/maxMgr*100)+'%;background:#3B6EA5;"></div></div></div>' +
+        '<div class="lb-count">'+yawasCnt+'場</div>' +
+      '</div>';
+
+    // --- 3. Room usage ---
+    var ROOMS = ['小會議室','大會議室','洽談室Ａ','洽談室Ｂ'];
+    var roomCnt = {};
+    ROOMS.forEach(function(r){ roomCnt[r]=0; });
+    mb.forEach(function(b){ if(ROOMS.indexOf(b.location)>-1) roomCnt[b.location]++; });
+    var maxRC = Math.max.apply(null, ROOMS.map(function(r){ return roomCnt[r]; }))||1;
+    var ROOM_EMOJIS = {'小會議室':'🏠','大會議室':'🏛️','洽談室Ａ':'💼','洽談室Ｂ':'💬'};
+    var roomHTML = ROOMS.sort(function(a,b){ return roomCnt[b]-roomCnt[a]; }).map(function(r){
+      var quip = roomCnt[r]===0 ? (ZERO_MSG[Math.floor(Math.random()*ZERO_MSG.length)]) : (ROOM_QUIPS[r]||'');
+      return '<div class="lb-room-row">' +
+        '<div class="lb-room-emoji">'+ROOM_EMOJIS[r]+'</div>' +
+        '<div class="lb-room-name">'+escapeHtml(r)+'<br><small style="color:var(--ink-faint);font-weight:400;">'+escapeHtml(quip)+'</small></div>' +
+        '<div class="lb-room-bar"><div class="lb-room-fill" style="width:'+Math.round(roomCnt[r]/maxRC*100)+'%;"></div></div>' +
+        '<div class="lb-room-count">'+roomCnt[r]+'場</div>' +
+      '</div>';
+    }).join('');
+
+    // --- 4. Fun facts ---
+    var totalMeetings = mb.length;
+    var totalMins = mb.reduce(function(sum,b){ return sum + timeToMinutes(b.end) - timeToMinutes(b.start); }, 0);
+    var totalHrs = (totalMins/60).toFixed(1);
+    var busiestDay = (function(){
+      var dc={};
+      mb.forEach(function(b){ dc[b.date]=(dc[b.date]||0)+1; });
+      var best=Object.keys(dc).sort(function(a,b){ return dc[b]-dc[a]; })[0];
+      return best ? best+' ('+dc[best]+'場)' : '—';
+    })();
+    var funHTML = '<div class="lb-fun-box">' +
+      '📊 本月共完成 <strong>'+totalMeetings+' 場</strong>會議，合計 <strong>'+totalHrs+' 小時</strong>的腦力激盪。<br>' +
+      '🔥 最忙的一天是 <strong>'+escapeHtml(busiestDay)+'</strong>。<br>' +
+      (totalMeetings>=20 ? '💪 大家都超拼的！主管辛苦了～' :
+       totalMeetings>=10 ? '✨ 穩健的一個月，繼續加油！' :
+       '🌱 本月節奏輕鬆，留點時間深呼吸～') +
+    '</div>';
+
+    body.innerHTML =
+      '<div class="lb-section"><div class="lb-section-title">🏆 最勤奮同仁（找主管場次）</div>'+personHTML+'</div>' +
+      '<div class="lb-section"><div class="lb-section-title">⭐ 主管人氣榜</div>'+mgrHTML+'</div>' +
+      '<div class="lb-section"><div class="lb-section-title">🏢 會議室使用排行</div>'+roomHTML+'</div>' +
+      '<div class="lb-section"><div class="lb-section-title">💬 本月趣聞</div>'+funHTML+'</div>';
+
+    document.getElementById('lbModal').classList.remove('hidden');
+  }
+
   // ---------- calendar / timeline ----------
   function renderDayStrip(){
     var strip = document.getElementById('dayStrip');
@@ -2587,6 +2752,9 @@
     });
 
     document.getElementById('adminLinkBtn').addEventListener('click', openAdminPasswordModal);
+    document.getElementById('lbOpenBtn').addEventListener('click', openLeaderboard);
+    document.getElementById('lbCloseBtn').addEventListener('click', function(){ document.getElementById('lbModal').classList.add('hidden'); });
+    document.getElementById('lbModal').addEventListener('click', function(e){ if(e.target===this) this.classList.add('hidden'); });
     document.getElementById('epClose').addEventListener('click', hideEventPopup);
     document.getElementById('eventPopupOverlay').addEventListener('click', hideEventPopup);
     document.addEventListener('keydown', function(e){ if(e.key==='Escape') hideEventPopup(); });
