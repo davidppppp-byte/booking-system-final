@@ -1802,7 +1802,37 @@
       '</div>';
     }).join('') : '<div class="lb-empty">本月沒有人跟主管預約 🌱</div>';
 
-    // --- 2. Manager popularity ---
+    // --- 1b. Top room bookers ---
+    var roomBookings = mb.filter(function(b){ return b.bookingMode==='room'; });
+    var roomPersonCount = {};
+    roomBookings.forEach(function(b){
+      var key = b.applicant || '（未填）';
+      roomPersonCount[key] = (roomPersonCount[key]||0) + 1;
+    });
+    var topRoomPersons = Object.keys(roomPersonCount).sort(function(a,b){ return roomPersonCount[b]-roomPersonCount[a]; }).slice(0,5);
+    var maxRPC = topRoomPersons.length ? roomPersonCount[topRoomPersons[0]] : 1;
+    var ROOM_PERSON_MSGS = [
+      ['會議室的靈魂人物！哪間都有你的足跡 🏢','訂房高手，下次附上飲料就更完美了 ☕','會議室找你準沒錯 🔑'],
+      ['穩定使用者，口碑好 👍','低調但扎實的存在 🌿','每次預約都讓會議室有了靈魂 ✨'],
+      ['正在累積會議室資歷中 📈','潛力無窮！繼續加油 ⚡','慢慢來，會議室永遠等你 🚪'],
+    ];
+    var roomPersonHTML = topRoomPersons.length ? topRoomPersons.map(function(name, i){
+      var cnt = roomPersonCount[name];
+      var funnyArr = ROOM_PERSON_MSGS[Math.min(i, ROOM_PERSON_MSGS.length-1)];
+      var funny = funnyArr[Math.floor(Math.random()*funnyArr.length)];
+      var barW = Math.round(cnt/maxRPC*100);
+      return '<div class="lb-row">' +
+        '<div class="lb-rank">'+FUNNY_RANKS[i]+'</div>' +
+        '<div class="lb-info">' +
+          '<div class="lb-name">'+escapeHtml(name)+'</div>' +
+          '<div class="lb-sub">'+funny+'</div>' +
+          '<div class="lb-bar-wrap"><div class="lb-bar" style="width:'+barW+'%;background:#3E6E66;"></div></div>' +
+        '</div>' +
+        '<div class="lb-count">'+cnt+'次</div>' +
+      '</div>';
+    }).join('') : '<div style="padding:12px;color:var(--ink-faint);font-size:13px;text-align:center;">本月還沒有人預約會議室 🌱</div>';
+
+
     var davidCnt = davidBookings.filter(function(b){ return b.participants==='david'||b.participants==='both'; }).length;
     var yawasCnt = davidBookings.filter(function(b){ return b.participants==='yawas'||b.participants==='both'; }).length;
     var maxMgr = Math.max(davidCnt, yawasCnt, 1);
@@ -1857,8 +1887,9 @@
 
     body.innerHTML =
       '<div class="lb-section"><div class="lb-section-title">🏆 最勤奮同仁（找主管場次）</div>'+personHTML+'</div>' +
+      '<div class="lb-section"><div class="lb-section-title">🏢 預約會議室王</div>'+roomPersonHTML+'</div>' +
       '<div class="lb-section"><div class="lb-section-title">⭐ 主管人氣榜</div>'+mgrHTML+'</div>' +
-      '<div class="lb-section"><div class="lb-section-title">🏢 會議室使用排行</div>'+roomHTML+'</div>' +
+      '<div class="lb-section"><div class="lb-section-title">📊 會議室使用排行</div>'+roomHTML+'</div>' +
       '<div class="lb-section"><div class="lb-section-title">💬 本月趣聞</div>'+funHTML+'</div>';
 
     document.getElementById('lbModal').classList.remove('hidden');
