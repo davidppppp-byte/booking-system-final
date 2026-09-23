@@ -1156,7 +1156,9 @@
       '請登入後台審核 ✅'
     ].filter(Boolean).join('\n');
 
-    targets.forEach(function(name){
+    function sendNext(i){
+      if(i >= targets.length) return;
+      var name = targets[i];
       fetch(COLINE_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'token': COLINE_TOKEN },
@@ -1166,8 +1168,11 @@
         })
       }).catch(function(err){
         console.warn('COLINE 通知失敗（不影響預約流程）', err);
+      }).finally(function(){
+        setTimeout(function(){ sendNext(i + 1); }, 600);
       });
-    });
+    }
+    sendNext(0);
   }
 
   // ---------- email notification ----------
