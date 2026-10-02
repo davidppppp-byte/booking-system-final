@@ -1082,6 +1082,60 @@ header.top::after {
   font-size: 11.5px; font-weight: 700; margin-left: 6px;
 }
 
+/* ── Event popup — bottom sheet on mobile ── */
+@media (max-width: 560px) {
+  .event-popup {
+    position: fixed !important;
+    left: 0 !important; right: 0 !important;
+    bottom: 0 !important; top: auto !important;
+    width: 100% !important;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform .3s cubic-bezier(.32,.72,0,1);
+  }
+  .event-popup.visible {
+    transform: translateY(0);
+  }
+  .event-popup-overlay {
+    background: rgba(26,22,16,.44) !important;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+}
+
+/* ── Dept management (admin) ── */
+.dept-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.dept-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border: 1px solid var(--border-2);
+  border-radius: var(--r-md); background: var(--surface-2);
+  font-size: 14px; color: var(--ink);
+}
+.dept-row .dept-name { font-weight: 600; }
+.dept-row .dept-default { font-size: 11px; color: var(--ink-3); margin-left: 8px; }
+.dept-del-btn {
+  background: none; border: none; color: var(--err); font-size: 16px;
+  cursor: pointer; padding: 0 4px; line-height: 1;
+  opacity: .7; transition: opacity .12s;
+}
+.dept-del-btn:hover { opacity: 1; }
+.dept-add-row { display: flex; gap: 8px; }
+.dept-add-row input {
+  flex: 1; padding: 10px 14px; border: 1.5px solid var(--border);
+  border-radius: var(--r-md); font-size: 14px; font-family: inherit;
+  background: var(--surface-2); color: var(--ink);
+}
+.dept-add-row input:focus { outline: none; border-color: var(--gold-mid); background: #fff; box-shadow: 0 0 0 3px var(--gold-ring); }
+.dept-add-btn {
+  padding: 10px 20px; background: var(--ink); color: #fff;
+  border: none; border-radius: var(--r-md); font-weight: 700;
+  font-size: 14px; white-space: nowrap; font-family: inherit;
+  cursor: pointer; transition: background .14s;
+}
+.dept-add-btn:hover { background: #000; }
+
 /* ── Cancel button ── */
 .cancel-booking-btn {
   padding: 7px 13px; border-radius: var(--r-sm);
@@ -1243,15 +1297,6 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
             <label for="deptSelect">部門<span class="req">*</span></label>
             <select id="deptSelect">
               <option value="" disabled selected>請選擇部門</option>
-              <option>營運長室</option>
-              <option>職安室</option>
-              <option>財務部</option>
-              <option>採購部</option>
-              <option>人力資源部</option>
-              <option>行政管理部</option>
-              <option>行銷部</option>
-              <option>客服部</option>
-              <option>商務拓展部</option>
             </select>
           </div>
           <div id="formMsg" class="form-msg hidden"></div>
@@ -1298,15 +1343,6 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
           <label for="roomDepartment">部門<span class="req">*</span></label>
           <select id="roomDepartment">
             <option value="" disabled selected>請選擇部門</option>
-            <option>營運長室</option>
-            <option>職安室</option>
-            <option>財務部</option>
-            <option>採購部</option>
-            <option>人力資源部</option>
-            <option>行政管理部</option>
-            <option>行銷部</option>
-            <option>客服部</option>
-            <option>商務拓展部</option>
           </select>
         </div>
         <div class="field">
@@ -1496,6 +1532,7 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       <button type="button" class="tab-btn" data-tab="blocked">封鎖時段 <span class="count" id="count-blocked">0</span></button>
       <button type="button" class="tab-btn" data-tab="room-bookings">會議室預約 <span class="count" id="count-room">0</span></button>
       <button type="button" class="tab-btn" data-tab="admin-add">＋ 手動新增</button>
+      <button type="button" class="tab-btn" data-tab="dept-mgmt">部門管理</button>
     </div>
 
     <div id="adminAddFormCard" class="card hidden" style="margin-bottom:18px;">
@@ -1563,6 +1600,16 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
         </div>
         <div id="blockFormMsg" class="form-msg hidden"></div>
         <button type="button" class="submit-btn" id="addBlockBtn">新增封鎖時段</button>
+      </div>
+    </div>
+
+    <div id="deptMgmtCard" class="card hidden" style="margin-bottom:18px;">
+      <div class="subscribe-title" style="margin-bottom:4px;">部門清單管理</div>
+      <p class="admin-sub" style="margin-bottom:16px;">新增或刪除部門，變更後預約表單的部門選單會立即更新。預設部門無法刪除。</p>
+      <div class="dept-list" id="deptList"></div>
+      <div class="dept-add-row">
+        <input type="text" id="deptAddInput" placeholder="輸入部門名稱">
+        <button type="button" class="dept-add-btn" id="deptAddBtn">新增</button>
       </div>
     </div>
 
@@ -1653,6 +1700,47 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
 
   var ADMIN_PASSWORD = '25773388';   // David
   var YAWAS_PASSWORD = 'yawas2024';  // Yawas（可請 Yawas 自行修改）
+
+  // ── Department list (editable via admin) ──────────────────────
+  var DEFAULT_DEPTS = ['營運長室','職安室','財務部','採購部','人力資源部','行政管理部','行銷部','客服部','商務拓展部'];
+  var customDepts = (function(){
+    try { return JSON.parse(localStorage.getItem('monen_custom_depts') || '[]'); } catch(e){ return []; }
+  })();
+  function getAllDepts(){ return DEFAULT_DEPTS.concat(customDepts.filter(function(d){ return DEFAULT_DEPTS.indexOf(d) < 0; })); }
+  function saveCustomDepts(){ try { localStorage.setItem('monen_custom_depts', JSON.stringify(customDepts)); } catch(e){} }
+  function populateDeptSelects(){
+    var depts = getAllDepts();
+    ['deptSelect','roomDepartment'].forEach(function(id){
+      var sel = document.getElementById(id);
+      if(!sel) return;
+      var cur = sel.value;
+      while(sel.options.length > 1) sel.remove(1);
+      depts.forEach(function(d){ var o = document.createElement('option'); o.value = d; o.textContent = d; sel.appendChild(o); });
+      if(cur) sel.value = cur;
+    });
+  }
+  function renderDeptMgmt(){
+    var list = document.getElementById('deptList');
+    if(!list) return;
+    var depts = getAllDepts();
+    list.innerHTML = depts.map(function(d){
+      var isDefault = DEFAULT_DEPTS.indexOf(d) >= 0;
+      return '<div class="dept-row">' +
+        '<span class="dept-name">'+escapeHtml(d)+(isDefault?'<span class="dept-default">預設</span>':'')+'</span>' +
+        (isDefault ? '' : '<button class="dept-del-btn" data-dept="'+escapeHtml(d)+'" title="刪除">×</button>') +
+        '</div>';
+    }).join('');
+    list.querySelectorAll('.dept-del-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var name = btn.dataset.dept;
+        customDepts = customDepts.filter(function(d){ return d !== name; });
+        saveCustomDepts();
+        renderDeptMgmt();
+        populateDeptSelects();
+      });
+    });
+  }
+  // ─────────────────────────────────────────────────────────────
   var YAWAS_COLOR = '#3B6EA5';
   var BOTH_PERSON_COLOR = '#7C5C8C';
   var DAY_START = 8, DAY_END = 17;
@@ -2517,8 +2605,10 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
 
   // ---------- event popup ----------
   function hideEventPopup(){
-    document.getElementById('eventPopup').classList.add('hidden');
+    var popup = document.getElementById('eventPopup');
+    popup.classList.remove('visible');
     document.getElementById('eventPopupOverlay').classList.add('hidden');
+    setTimeout(function(){ popup.classList.add('hidden'); }, 320);
   }
 
   function showEventPopup(ev, clickX, clickY){
@@ -2554,6 +2644,7 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     var popup = document.getElementById('eventPopup');
     popup.classList.remove('hidden');
     document.getElementById('eventPopupOverlay').classList.remove('hidden');
+    requestAnimationFrame(function(){ popup.classList.add('visible'); });
 
     // Position the popup smartly near the click point
     var pw = 290, ph = popup.offsetHeight || 240;
@@ -2872,9 +2963,11 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
 
     document.getElementById('blockFormCard').classList.toggle('hidden', adminTab !== 'blocked');
     document.getElementById('adminAddFormCard').classList.toggle('hidden', adminTab !== 'admin-add');
+    document.getElementById('deptMgmtCard').classList.toggle('hidden', adminTab !== 'dept-mgmt');
     if(adminTab === 'blocked'){ renderBlockedList(list); return; }
     if(adminTab === 'admin-add'){ list.innerHTML = ''; return; }
     if(adminTab === 'room-bookings'){ renderRoomBookingList(list); return; }
+    if(adminTab === 'dept-mgmt'){ renderDeptMgmt(); list.innerHTML = ''; return; }
 
     var filtered = bookings.filter(function(b){
       return b.status===adminTab && b.type!=='block' && b.bookingMode==='david' &&
@@ -3389,6 +3482,9 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       document.querySelectorAll('.room-dur-chip').forEach(function(c){ c.classList.remove('active'); });
     });
 
+    // populate dept selects
+    populateDeptSelects();
+
     // populate admin-add location select
     LOCATIONS.forEach(function(loc){
       var opt = document.createElement('option');
@@ -3481,6 +3577,20 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     document.getElementById('adminList').addEventListener('click', handleAdminListClick);
     document.getElementById('addBlockBtn').addEventListener('click', handleAddBlock);
     document.getElementById('adminAddSubmitBtn').addEventListener('click', handleAdminAddBooking);
+    document.getElementById('deptAddBtn').addEventListener('click', function(){
+      var input = document.getElementById('deptAddInput');
+      var name = (input.value || '').trim();
+      if(!name) return;
+      if(getAllDepts().indexOf(name) >= 0){ input.value = ''; return; }
+      customDepts.push(name);
+      saveCustomDepts();
+      input.value = '';
+      renderDeptMgmt();
+      populateDeptSelects();
+    });
+    document.getElementById('deptAddInput').addEventListener('keydown', function(e){
+      if(e.key === 'Enter') document.getElementById('deptAddBtn').click();
+    });
     document.querySelectorAll('#adminAddParticipantsRow .participant-btn').forEach(function(btn){
       btn.addEventListener('click', function(){
         document.querySelectorAll('#adminAddParticipantsRow .participant-btn').forEach(function(b){ b.classList.remove('active'); });
