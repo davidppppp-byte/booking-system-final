@@ -920,6 +920,11 @@ header.top::after {
   box-shadow: var(--shadow-lg);
   width: 296px; overflow: hidden;
   border: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.event-popup.visible {
+  opacity: 1;
 }
 .event-popup-header {
   padding: 14px 16px 12px; color: #fff; position: relative;
@@ -1093,10 +1098,12 @@ header.top::after {
     max-height: 80vh;
     overflow-y: auto;
     transform: translateY(100%);
+    opacity: 1;
     transition: transform .3s cubic-bezier(.32,.72,0,1);
   }
   .event-popup.visible {
     transform: translateY(0);
+    opacity: 1;
   }
   .event-popup-overlay {
     background: rgba(26,22,16,.44) !important;
@@ -2642,21 +2649,33 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     }).join('');
 
     var popup = document.getElementById('eventPopup');
+    var isMobile = window.innerWidth <= 560;
     popup.classList.remove('hidden');
     document.getElementById('eventPopupOverlay').classList.remove('hidden');
-    requestAnimationFrame(function(){ popup.classList.add('visible'); });
 
-    // Position the popup smartly near the click point
-    var pw = 290, ph = popup.offsetHeight || 240;
-    var vw = window.innerWidth, vh = window.innerHeight;
-    var left = clickX + 12;
-    var top  = clickY - 40;
-    if(left + pw > vw - 12) left = clickX - pw - 12;
-    if(top + ph > vh - 12) top = vh - ph - 12;
-    if(top < 12) top = 12;
-    if(left < 12) left = 12;
-    popup.style.left = left + 'px';
-    popup.style.top  = top  + 'px';
+    if(isMobile){
+      // Bottom sheet: slide up via .visible
+      requestAnimationFrame(function(){ popup.classList.add('visible'); });
+    } else {
+      // Desktop: position near click point, clear any mobile inline styles
+      popup.style.removeProperty('left');
+      popup.style.removeProperty('top');
+      popup.style.removeProperty('transform');
+      requestAnimationFrame(function(){
+        var pw = popup.offsetWidth || 296;
+        var ph = popup.offsetHeight || 260;
+        var vw = window.innerWidth, vh = window.innerHeight;
+        var left = clickX + 14;
+        var top  = clickY - 40;
+        if(left + pw > vw - 12) left = clickX - pw - 14;
+        if(top + ph > vh - 12) top = vh - ph - 12;
+        if(top < 12) top = 12;
+        if(left < 12) left = 12;
+        popup.style.left = left + 'px';
+        popup.style.top  = top  + 'px';
+        popup.classList.add('visible');
+      });
+    }
   }
 
   // ---------- calendar / timeline ----------
