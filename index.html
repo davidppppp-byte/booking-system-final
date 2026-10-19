@@ -946,6 +946,15 @@ header.top::after {
   transition: background .12s;
 }
 .ep-close:hover { background: rgba(255,255,255,.38); }
+.ep-admin-actions { padding: 10px 16px 14px; border-top: 1px solid var(--border-2); }
+.ep-delete-btn {
+  width: 100%; padding: 9px; border: 1.5px solid var(--err);
+  background: none; color: var(--err); border-radius: var(--r-md);
+  font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+  transition: background .14s, color .14s;
+}
+.ep-delete-btn:hover { background: var(--err); color: #fff; }
+.ep-delete-btn.confirming { background: var(--err); color: #fff; }
 
 /* ── Approval status chips ── */
 .approval-status { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
@@ -1037,7 +1046,17 @@ header.top::after {
 }
 .admin-header h1 { font-size: 22px; margin: 0; font-family: var(--serif); }
 .admin-header .actions { display: flex; gap: 8px; }
-.admin-sub { color: var(--ink-2); font-size: 13px; margin: 0 0 24px; line-height: 1.5; }
+.admin-sub { color: var(--ink-2); font-size: 13px; margin: 0 0 16px; line-height: 1.5; }
+.admin-search-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: var(--r-lg); padding: 10px 14px; margin-bottom: 20px;
+}
+.admin-search-bar input[type="text"] { flex: 1 1 160px; min-width: 120px; border: none; background: none; font-size: 13.5px; outline: none; font-family: inherit; }
+.admin-search-bar input[type="date"], .admin-search-bar select { border: 1px solid var(--border-2); border-radius: var(--r-sm); padding: 5px 8px; font-size: 12.5px; background: var(--surface-2); font-family: inherit; }
+.admin-search-sep { color: var(--ink-3); font-size: 12px; }
+.admin-search-clear { padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: none; font-size: 12px; color: var(--ink-2); cursor: pointer; font-family: inherit; white-space: nowrap; }
+.admin-search-clear:hover { border-color: var(--err); color: var(--err); }
 
 /* ── Admin tabs ── */
 .tabs { display: flex; gap: 7px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -1088,7 +1107,27 @@ header.top::after {
 }
 
 /* ── Event popup — bottom sheet on mobile ── */
+/* ── Week view mobile day navigator ── */
+.week-day-nav {
+  display: none;
+  align-items: center; justify-content: space-between;
+  padding: 10px 4px 6px; gap: 8px;
+}
+.week-day-nav .wdn-arrow {
+  background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: var(--r-sm); padding: 6px 14px;
+  font-size: 15px; cursor: pointer; color: var(--ink-2); font-family: inherit;
+}
+.week-day-nav .wdn-arrow:hover { border-color: var(--gold-mid); color: var(--gold); }
+.week-day-nav .wdn-label { font-size: 13px; font-weight: 700; text-align: center; flex: 1; }
+.week-day-nav .wdn-label small { display: block; font-size: 11px; color: var(--ink-3); font-weight: 400; margin-top: 1px; }
+
 @media (max-width: 560px) {
+  .week-day-nav { display: flex; }
+  .week-grid { min-width: unset; display: block !important; overflow: visible; }
+  .week-col { display: none; border-right: none; border-bottom: 1px solid var(--border-2); }
+  .week-col.wc-active { display: block; }
+
   .event-popup {
     position: fixed !important;
     left: 0 !important; right: 0 !important;
@@ -1444,16 +1483,6 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       <div id="lookupResults"></div>
     </div>
 
-    <div class="section-heading">
-      <h2>訂閱行事曆</h2>
-      <span class="hint">加入 Apple / Google 行事曆，自動同步</span>
-    </div>
-
-    <div class="subscribe-section">
-      <div class="subscribe-title">📅 選擇要訂閱的行程</div>
-      <div class="subscribe-sub">訂閱後，Apple 行事曆約每幾小時自動同步；Google 行事曆點「手動重新整理」即可更新。</div>
-      <div class="subscribe-rows" id="subscribeRows"></div>
-    </div>
 
     <div class="section-heading">
       <h2>本週會議室使用率</h2>
@@ -1502,6 +1531,11 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     </div>
 
     <div id="weekView" class="hidden">
+      <div class="week-day-nav" id="weekDayNav">
+        <button type="button" class="wdn-arrow" id="wdnPrev">‹</button>
+        <div class="wdn-label" id="wdnLabel">週一<small>10/21</small></div>
+        <button type="button" class="wdn-arrow" id="wdnNext">›</button>
+      </div>
       <div class="week-grid" id="weekGrid"></div>
     </div>
 
@@ -1518,6 +1552,9 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       <button type="button" class="ep-close" id="epClose">✕</button>
     </div>
     <div class="event-popup-body" id="eventPopupBody"></div>
+    <div id="epAdminActions" class="ep-admin-actions hidden">
+      <button type="button" class="ep-delete-btn" id="epDeleteBtn">刪除此預約</button>
+    </div>
   </div>
 </div>
 
@@ -1531,6 +1568,15 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       </div>
     </div>
     <p class="admin-sub">審核同仁送出的會議預約申請，或自行封鎖時段（例如請假、已安排行程），讓同仁無法在該時段預約。</p>
+
+    <div class="admin-search-bar">
+      <input type="text" id="adminSearchName" placeholder="🔍 搜尋姓名或主題…" autocomplete="off">
+      <select id="adminSearchDept"><option value="">所有部門</option></select>
+      <input type="date" id="adminSearchFrom" title="開始日期">
+      <span class="admin-search-sep">—</span>
+      <input type="date" id="adminSearchTo" title="結束日期">
+      <button type="button" class="admin-search-clear" id="adminSearchClear">清除</button>
+    </div>
 
     <div class="tabs">
       <button type="button" class="tab-btn" data-tab="pending">待審核 <span class="count" id="count-pending">0</span></button>
@@ -1779,6 +1825,7 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
   var currentViewDate = todayStr();
   var calendarView = 'day';
   var calendarFilter = 'all'; // 'all' | 'david' | 'yawas'
+  var weekActiveDayIndex = 0; // 0=Mon … 6=Sun, mobile week view
   var currentMode = 'david';  // 'david' | 'room'
   var isAdmin = false;
   var currentAdmin = null; // 'david' | 'yawas'
@@ -2079,8 +2126,15 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       document.getElementById('roomRecurCheck').checked = false;
       document.getElementById('roomRecurOptions').classList.add('hidden');
       document.querySelectorAll('.room-dur-chip').forEach(function(c){ c.classList.remove('active'); });
+      var bookedDate = document.getElementById('roomDate').value;
       return refreshData().then(function(){
         document.getElementById('roomSuccessModal').classList.remove('hidden');
+        if(bookedDate){ currentViewDate = bookedDate; document.getElementById('jumpDate').value = bookedDate; renderCalendar(); }
+        setTimeout(function(){
+          document.getElementById('roomSuccessModal').classList.add('hidden');
+          var calEl = document.querySelector('.cal-controls');
+          if(calEl) calEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 2200);
       });
     }).catch(function(err){
       console.error('會議室登記失敗', err);
@@ -2493,8 +2547,15 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       document.getElementById('davidRecurCheck').checked = false;
       document.getElementById('davidRecurOptions').classList.add('hidden');
       document.querySelectorAll('.dur-chip').forEach(function(c){ c.classList.remove('active'); });
+      var bookedDate = document.getElementById('dateInput').value;
       return refreshData().then(function(){
         document.getElementById('successModal').classList.remove('hidden');
+        if(bookedDate){ currentViewDate = bookedDate; document.getElementById('jumpDate').value = bookedDate; renderCalendar(); }
+        setTimeout(function(){
+          document.getElementById('successModal').classList.add('hidden');
+          var calEl = document.querySelector('.cal-controls');
+          if(calEl) calEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 2200);
       });
     }).catch(function(err){
       console.error('送出失敗', err);
@@ -2648,6 +2709,30 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       return '<div class="ep-row"><div class="ep-icon">'+r.icon+'</div><div class="ep-content"><div class="ep-label">'+escapeHtml(r.label)+'</div><div class="ep-val">'+escapeHtml(r.val)+'</div></div></div>';
     }).join('');
 
+    // Admin delete button
+    var epAdmin = document.getElementById('epAdminActions');
+    var epDelBtn = document.getElementById('epDeleteBtn');
+    if(isAdmin && ev.id && ev.type !== 'block'){
+      epAdmin.classList.remove('hidden');
+      epDelBtn.textContent = '刪除此預約';
+      epDelBtn.classList.remove('confirming');
+      epDelBtn.onclick = function(){
+        if(!epDelBtn.classList.contains('confirming')){
+          epDelBtn.classList.add('confirming');
+          epDelBtn.textContent = '確定刪除？（再按一次確認）';
+          setTimeout(function(){ epDelBtn.classList.remove('confirming'); epDelBtn.textContent = '刪除此預約'; }, 3000);
+        } else {
+          epDelBtn.textContent = '刪除中…'; epDelBtn.disabled = true;
+          deleteBookingRow(ev.id).then(function(){
+            hideEventPopup();
+            return refreshData();
+          }).catch(function(){ alert('刪除失敗，請重試'); epDelBtn.disabled = false; epDelBtn.textContent = '刪除此預約'; });
+        }
+      };
+    } else {
+      epAdmin.classList.add('hidden');
+    }
+
     var popup = document.getElementById('eventPopup');
     var isMobile = window.innerWidth <= 560;
     popup.classList.remove('hidden');
@@ -2713,6 +2798,7 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     var wStart = weekStartOf(currentViewDate);
     var today = todayStr();
     var week = ['週一','週二','週三','週四','週五','週六','週日'];
+    var isMobileWeek = window.innerWidth <= 560;
     var grid = document.getElementById('weekGrid');
     grid.innerHTML = '';
     document.getElementById('timelineDateLabel').textContent = (function(){
@@ -2721,13 +2807,18 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       return ws.getFullYear()+'年'+(ws.getMonth()+1)+'月'+ws.getDate()+'日 – '+(we.getMonth()+1)+'月'+we.getDate()+'日';
     })();
 
+    // Clamp weekActiveDayIndex
+    if(weekActiveDayIndex < 0) weekActiveDayIndex = 6;
+    if(weekActiveDayIndex > 6) weekActiveDayIndex = 0;
+
     for(var i=0;i<7;i++){
       var dateStr = addDays(wStart, i);
       var dayEvents = getFilteredBookings().filter(function(b){ return b.status==='approved' && b.date===dateStr; })
         .sort(function(a,b){ return timeToMinutes(a.start)-timeToMinutes(b.start); });
 
       var col = document.createElement('div');
-      col.className = 'week-col';
+      col.className = 'week-col' + (isMobileWeek && i===weekActiveDayIndex ? ' wc-active' : '');
+      col.dataset.dayIndex = i;
 
       var head = document.createElement('div');
       head.className = 'week-col-head' + (dateStr===today?' today':'');
@@ -2761,6 +2852,14 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       }
       col.appendChild(evBox);
       grid.appendChild(col);
+    }
+
+    // Mobile: update day navigator label
+    if(isMobileWeek){
+      var activeDate = addDays(wStart, weekActiveDayIndex);
+      var d = new Date(activeDate+'T00:00:00');
+      document.getElementById('wdnLabel').innerHTML =
+        week[weekActiveDayIndex] + '<small>' + (d.getMonth()+1) + '/' + d.getDate() + '</small>';
     }
   }
 
@@ -2988,9 +3087,23 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     if(adminTab === 'room-bookings'){ renderRoomBookingList(list); return; }
     if(adminTab === 'dept-mgmt'){ renderDeptMgmt(); list.innerHTML = ''; return; }
 
+    var searchName = (document.getElementById('adminSearchName').value || '').trim().toLowerCase();
+    var searchDept = (document.getElementById('adminSearchDept').value || '');
+    var searchFrom = (document.getElementById('adminSearchFrom').value || '');
+    var searchTo   = (document.getElementById('adminSearchTo').value || '');
+
     var filtered = bookings.filter(function(b){
-      return b.status===adminTab && b.type!=='block' && b.bookingMode==='david' &&
-        myParticipants.indexOf(b.participants)>-1;
+      if(b.status!==adminTab || b.type==='block' || b.bookingMode!=='david') return false;
+      if(myParticipants.indexOf(b.participants)<0) return false;
+      if(searchName && !(
+        (b.applicant||'').toLowerCase().indexOf(searchName)>-1 ||
+        (b.subject||'').toLowerCase().indexOf(searchName)>-1 ||
+        (b.attendees||'').toLowerCase().indexOf(searchName)>-1
+      )) return false;
+      if(searchDept && (b.department||'')!==searchDept) return false;
+      if(searchFrom && b.date < searchFrom) return false;
+      if(searchTo && b.date > searchTo) return false;
+      return true;
     }).sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); });
 
     if(filtered.length===0){
@@ -3155,8 +3268,21 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
   }
 
   function renderRoomBookingList(list){
-    var rooms = bookings.filter(function(b){ return b.bookingMode==='room'; })
-      .sort(function(a,b){
+    var searchName = (document.getElementById('adminSearchName').value || '').trim().toLowerCase();
+    var searchDept = (document.getElementById('adminSearchDept').value || '');
+    var searchFrom = (document.getElementById('adminSearchFrom').value || '');
+    var searchTo   = (document.getElementById('adminSearchTo').value || '');
+    var rooms = bookings.filter(function(b){
+      if(b.bookingMode!=='room') return false;
+      if(searchName && !(
+        (b.applicant||'').toLowerCase().indexOf(searchName)>-1 ||
+        (b.subject||'').toLowerCase().indexOf(searchName)>-1
+      )) return false;
+      if(searchDept && (b.department||'')!==searchDept) return false;
+      if(searchFrom && b.date < searchFrom) return false;
+      if(searchTo && b.date > searchTo) return false;
+      return true;
+    }).sort(function(a,b){
         if(a.date !== b.date) return a.date < b.date ? -1 : 1;
         return timeToMinutes(a.start) - timeToMinutes(b.start);
       });
@@ -3482,6 +3608,8 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     document.getElementById('roomSubmitBtn').addEventListener('click', handleRoomSubmit);
     document.getElementById('closeRoomSuccessModal').addEventListener('click', function(){
       document.getElementById('roomSuccessModal').classList.add('hidden');
+      var calEl = document.querySelector('.cal-controls');
+      if(calEl) calEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     // room duration chips
@@ -3528,6 +3656,8 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     document.getElementById('bookingForm').addEventListener('submit', handleSubmit);
     document.getElementById('closeSuccessModal').addEventListener('click', function(){
       document.getElementById('successModal').classList.add('hidden');
+      var calEl = document.querySelector('.cal-controls');
+      if(calEl) calEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     document.getElementById('closeConflictModal').addEventListener('click', function(){
       document.getElementById('conflictModal').classList.add('hidden');
@@ -3569,7 +3699,32 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       });
     });
     document.getElementById('viewDayBtn').addEventListener('click', function(){ setCalendarView('day'); });
-    document.getElementById('viewWeekBtn').addEventListener('click', function(){ setCalendarView('week'); });
+    document.getElementById('viewWeekBtn').addEventListener('click', function(){
+      // When entering week view on mobile, set active day to today's index in week (or Mon)
+      var wStart = weekStartOf(currentViewDate);
+      var todayInWeek = -1;
+      for(var i=0;i<7;i++){ if(addDays(wStart,i)===currentViewDate){ todayInWeek=i; break; } }
+      weekActiveDayIndex = todayInWeek >= 0 ? todayInWeek : 0;
+      setCalendarView('week');
+    });
+    document.getElementById('wdnPrev').addEventListener('click', function(){
+      weekActiveDayIndex--;
+      if(weekActiveDayIndex < 0){
+        weekActiveDayIndex = 6;
+        currentViewDate = addDays(weekStartOf(currentViewDate), -7);
+        document.getElementById('jumpDate').value = currentViewDate;
+      }
+      renderWeekView();
+    });
+    document.getElementById('wdnNext').addEventListener('click', function(){
+      weekActiveDayIndex++;
+      if(weekActiveDayIndex > 6){
+        weekActiveDayIndex = 0;
+        currentViewDate = addDays(weekStartOf(currentViewDate), 7);
+        document.getElementById('jumpDate').value = currentViewDate;
+      }
+      renderWeekView();
+    });
     document.getElementById('lookupBtn').addEventListener('click', handleLookup);
     document.getElementById('lookupNameInput').addEventListener('keydown', function(e){
       if(e.key === 'Enter'){ e.preventDefault(); handleLookup(); }
@@ -3586,6 +3741,26 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     });
     document.getElementById('backToMainBtn').addEventListener('click', hideAdminPanel);
     document.getElementById('adminRefreshBtn').addEventListener('click', refreshData);
+
+    // Populate search dept dropdown
+    (function(){
+      var deptSel = document.getElementById('adminSearchDept');
+      getAllDepts().forEach(function(d){
+        var o = document.createElement('option'); o.value = d; o.textContent = d; deptSel.appendChild(o);
+      });
+    })();
+
+    // Search bar events
+    ['adminSearchName','adminSearchDept','adminSearchFrom','adminSearchTo'].forEach(function(id){
+      document.getElementById(id).addEventListener('input', renderAdminList);
+    });
+    document.getElementById('adminSearchClear').addEventListener('click', function(){
+      document.getElementById('adminSearchName').value = '';
+      document.getElementById('adminSearchDept').selectedIndex = 0;
+      document.getElementById('adminSearchFrom').value = '';
+      document.getElementById('adminSearchTo').value = '';
+      renderAdminList();
+    });
     document.querySelectorAll('.tab-btn').forEach(function(btn){
       btn.addEventListener('click', function(){
         adminTab = btn.dataset.tab;
@@ -3623,7 +3798,6 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       renderDayStrip();
       renderTimeline();
       renderUsageDashboard();
-      renderSubscribeSection();
       handleQuickBook();
       setInterval(refreshData, 20000);
     });
