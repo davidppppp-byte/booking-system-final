@@ -2742,28 +2742,20 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       // Bottom sheet: slide up via .visible
       requestAnimationFrame(function(){ popup.classList.add('visible'); });
     } else {
-      // Desktop: position near click point, clear any mobile inline styles
-      // Move off-screen first so it's invisible while we measure
-      popup.style.left = '-9999px';
-      popup.style.top  = '-9999px';
+      // Desktop: position near click point using fixed dimensions (avoids layout-measurement timing issues)
+      var pw = 296; // matches CSS width
+      var ph = 300; // conservative height estimate
+      var vw = window.innerWidth, vh = window.innerHeight;
+      var left = clickX + 14;
+      var top  = clickY - 40;
+      if(left + pw > vw - 12) left = clickX - pw - 14;
+      if(top + ph > vh - 12) top = vh - ph - 12;
+      if(top < 12) top = 12;
+      if(left < 12) left = 12;
+      popup.style.left = left + 'px';
+      popup.style.top  = top  + 'px';
       popup.style.removeProperty('transform');
-      // Double rAF: first frame lets browser do layout, second we read size & position
-      requestAnimationFrame(function(){
-        requestAnimationFrame(function(){
-          var pw = popup.offsetWidth || 296;
-          var ph = popup.offsetHeight || 260;
-          var vw = window.innerWidth, vh = window.innerHeight;
-          var left = clickX + 14;
-          var top  = clickY - 40;
-          if(left + pw > vw - 12) left = clickX - pw - 14;
-          if(top + ph > vh - 12) top = vh - ph - 12;
-          if(top < 12) top = 12;
-          if(left < 12) left = 12;
-          popup.style.left = left + 'px';
-          popup.style.top  = top  + 'px';
-          popup.classList.add('visible');
-        });
-      });
+      requestAnimationFrame(function(){ popup.classList.add('visible'); });
     }
   }
 
