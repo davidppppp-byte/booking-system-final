@@ -2037,7 +2037,7 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       warnBox.textContent = '結束時間必須晚於開始時間';
       warnBox.classList.remove('hidden'); return;
     }
-    var conflict = findConflict(bookings, date, loc, start, end, null, 'room');
+    var conflict = findConflict(bookings, date, loc, start, end, null, 'room', null, true);
     if(conflict){
       var rmsg = '⚠ ' + conflictMessage(conflict, loc);
       var rNext = findNextAvailableSlot(date, loc, 'room', timeToMinutes(conflict.end));
@@ -2095,19 +2095,20 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     // 送出前再確認衝突
     loadBookings().then(function(fresh){
       bookings = fresh;
-      var conflict = findConflict(fresh, date, location, start, end, null, 'room');
-      if(conflict){
-        document.getElementById('conflictModalMsg').textContent = conflictMessage(conflict, location);
-        document.getElementById('conflictModal').classList.remove('hidden');
-        checkRoomConflict();
-        return null;
-      }
       var isRecur = document.getElementById('roomRecurCheck').checked;
       var recurDates = [date];
       if(isRecur){
         var freq  = parseInt(document.getElementById('roomRecurFreq').value, 10);
         var count = parseInt(document.getElementById('roomRecurCount').value, 10);
         for(var ri=1; ri<count; ri++) recurDates.push(addDays(date, ri*freq));
+      }
+      var hit = findConflictInDates(fresh, recurDates, location, start, end, 'room');
+      if(hit){
+        var prefix = recurDates.length>1 ? '週期預約第 '+(hit.index+1)+' 次（'+hit.date+'）：' : '';
+        document.getElementById('conflictModalMsg').textContent = prefix + conflictMessage(hit.conflict, location);
+        document.getElementById('conflictModal').classList.remove('hidden');
+        checkRoomConflict();
+        return null;
       }
       return Promise.all(recurDates.map(function(d){
         return insertBooking({
@@ -2373,7 +2374,9 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     tipBox.classList.remove('hidden');
   }
 
-  function findConflict(list, date, location, start, end, excludeId, mode, participants){
+  // includePending=true：待審核的預約也視為佔用該會議室（用在送出預約時），
+  // 審核通過時則只比對已通過的預約，避免兩筆待審互相卡住。
+  function findConflict(list, date, location, start, end, excludeId, mode, participants, includePending){
     var s = timeToMinutes(start), e = timeToMinutes(end);
     var persons = participants || 'david';
     var checkDavid = persons==='david' || persons==='both';
@@ -2384,7 +2387,9 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     var isMeetingRoom = location && MEETING_ROOMS.indexOf(location) > -1;
 
     return list.find(function(b){
-      if(b.status!=='approved' || b.date!==date || b.id===excludeId) return false;
+      if(b.date!==date || b.id===excludeId) return false;
+      var isPending = b.status==='pending' && b.type!=='block';
+      if(b.status!=='approved' && !(includePending && isPending)) return false;
       var overlap = timeToMinutes(b.start) < e && s < timeToMinutes(b.end);
       if(!overlap) return false;
 
@@ -2397,6 +2402,8 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
       // 個人行程 mode：
       // 1) 同一間四大會議室被任何已通過的預約（含室預約、個人行程）佔用就擋住
       if(isMeetingRoom && b.type!=='block' && b.location===location) return true;
+      // 待審核的預約只用來擋「同一間會議室」，不擋個人時間
+      if(b.status!=='approved') return false;
 
       // 2) 封鎖時段
       if(b.type==='block'){
@@ -2415,6 +2422,15 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     });
   }
 
+  // 週期預約：每一個日期都要檢查，不能只檢查第一天
+  function findConflictInDates(list, dates, location, start, end, mode, participants){
+    for(var i=0;i<dates.length;i++){
+      var c = findConflict(list, dates[i], location, start, end, null, mode, participants, true);
+      if(c) return { index: i, date: dates[i], conflict: c };
+    }
+    return null;
+  }
+
   function conflictMessage(conflict, location){
     if(conflict.type==='block'){
       var who = conflict.blockedFor==='yawas' ? 'Yawas' : 'David';
@@ -2426,7 +2442,7 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
         ? '（'+conflict.applicant+'・'+conflict.department+'）的會議室預約'
         : '（'+(conflict.participants==='yawas'?'Yawas':conflict.participants==='both'?'David / Yawas':'David')+'）的行程';
       return '此時段「'+location+'」已被《'+conflict.subject+'》'+byWhom+
-        '（'+conflict.start+'–'+conflict.end+'）佔用，請更換時間或地點。';
+        '（'+conflict.start+'–'+conflict.end+(conflict.status==='pending'?'，待審核中':'')+'）佔用，請更換時間或地點。';
     }
     var who = conflict.participants==='yawas'?'Yawas':conflict.participants==='both'?'David / Yawas':'David';
     return who+' 這個時段已有會議《'+conflict.subject+'》（'+conflict.start+'–'+conflict.end+'），請更換時間。';
@@ -2446,7 +2462,7 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
     }
     var s = timeToMinutes(start), e = timeToMinutes(end);
     var persons = document.getElementById('participantsInput').value || 'david';
-    var conflict = findConflict(bookings, date, loc, start, end, null, 'david', persons);
+    var conflict = findConflict(bookings, date, loc, start, end, null, 'david', persons, true);
     if(conflict){
       var dmsg = '⚠ ' + conflictMessage(conflict, loc);
       var dNext = findNextAvailableSlot(date, loc, 'david', timeToMinutes(conflict.end), document.getElementById('participantsInput').value);
@@ -2504,13 +2520,6 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
 
     loadBookings().then(function(fresh){
       bookings = fresh;
-      var conflict = findConflict(fresh, date, location, start, end, null, 'david', participants);
-      if(conflict){
-        document.getElementById('conflictModalMsg').textContent = conflictMessage(conflict, location);
-        document.getElementById('conflictModal').classList.remove('hidden');
-        checkConflict();
-        return null;
-      }
       // Build list of dates for recurring
       var isRecur = document.getElementById('davidRecurCheck').checked;
       var recurDates = [date];
@@ -2518,6 +2527,14 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
         var freq  = parseInt(document.getElementById('davidRecurFreq').value, 10);
         var count = parseInt(document.getElementById('davidRecurCount').value, 10);
         for(var ri=1; ri<count; ri++) recurDates.push(addDays(date, ri*freq));
+      }
+      var hit = findConflictInDates(fresh, recurDates, location, start, end, 'david', participants);
+      if(hit){
+        var prefix = recurDates.length>1 ? '週期預約第 '+(hit.index+1)+' 次（'+hit.date+'）：' : '';
+        document.getElementById('conflictModalMsg').textContent = prefix + conflictMessage(hit.conflict, location);
+        document.getElementById('conflictModal').classList.remove('hidden');
+        checkConflict();
+        return null;
       }
       return Promise.all(recurDates.map(function(d){
         return insertBooking({ applicant: applicant, attendees: attendees, date: d,
