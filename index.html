@@ -967,6 +967,8 @@ header.top::after {
 .apv-chip.done { background: var(--ok-bg); color: var(--ok); }
 .apv-chip.wait { background: var(--warn-bg); color: var(--warn); }
 .apv-chip.reject { background: var(--err-bg); color: var(--err); }
+.apv-hint { font-size: 12.5px; color: var(--ink-2, #5a5246); margin-top: 6px; }
+.apv-hint b { color: var(--warn); }
 .apv-chip.na { background: var(--surface-2); color: var(--ink-3); }
 
 /* ── Pending badge ── */
@@ -2586,6 +2588,29 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
   function statusLookupLabel(s){ return s==='pending' ? '待審核' : s==='approved' ? '已通過' : '已拒絕'; }
   function statusLookupClass(s){ return s==='pending' ? 'pending' : s==='approved' ? 'approved' : 'rejected'; }
 
+  // 主管會議的審核進度：讓申請人知道卡在哪一位主管
+  function approvalProgressHtml(b){
+    if(b.bookingMode!=='david' || b.status==='approved') return '';
+    var who = b.participants==='both' ? ['david','yawas'] : [b.participants==='yawas'?'yawas':'david'];
+    var names = {david:'David', yawas:'Yawas'};
+    var waiting = [], rejectedBy = [];
+    var chips = who.map(function(p){
+      var st = p==='yawas' ? b.approverYawas : b.approverDavid;
+      if(st===true)  return '<span class="apv-chip done">✓ '+names[p]+' 已通過</span>';
+      if(st===false){ rejectedBy.push(names[p]); return '<span class="apv-chip reject">✗ '+names[p]+' 已婉拒</span>'; }
+      waiting.push(names[p]);
+      return '<span class="apv-chip wait">⏳ '+names[p]+' 尚未審核</span>';
+    }).join('');
+    var hint = '';
+    if(b.status==='pending' && waiting.length){
+      hint = '<div class="apv-hint">目前等待 <b>'+waiting.join('、')+'</b> 審核'+
+        (who.length===2 && waiting.length===1 ? '，另一位主管已經通過了' : '')+'</div>';
+    } else if(b.status==='rejected' && rejectedBy.length){
+      hint = '<div class="apv-hint">由 '+rejectedBy.join('、')+' 婉拒</div>';
+    }
+    return '<div class="approval-status">'+chips+'</div>'+hint;
+  }
+
   function handleLookup(){
     var name = document.getElementById('lookupNameInput').value.trim();
     var box = document.getElementById('lookupResults');
@@ -2638,6 +2663,7 @@ button:focus-visible, .mode-btn:focus-visible { outline-offset: 3px; }
           '<div class="info">' +
             '<div class="top-line">'+escapeHtml(b.date)+' · '+escapeHtml(b.start)+'–'+escapeHtml(b.end)+' · '+escapeHtml(b.location)+modeTag+'</div>' +
             '<div class="subject">'+escapeHtml(b.subject)+'</div>' +
+            approvalProgressHtml(b) +
             note +
           '</div>' +
           '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
